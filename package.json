@@ -5,6 +5,13 @@
     "types": "dist/index.d.ts",
     "author": "SchemaFX",
     "description": "Build Without Boundaries.",
+    "bugs": {
+        "url": "https://github.com/schemafx/schemafx/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/schemafx/schemafx.git"
+    },
     "scripts": {
         "build": "tsc",
         "start": "node .",
