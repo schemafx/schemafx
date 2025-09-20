@@ -1,0 +1,34 @@
+{
+    "name": "schemafx",
+    "version": "0.0.0",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "author": "SchemaFX",
+    "description": "Build Without Boundaries.",
+    "scripts": {
+        "build": "tsc",
+        "start": "node .",
+        "dev": "tsx watch src/index.ts",
+        "prepare": "npm run build",
+        "lint": "eslint",
+        "test": "npm run test:types",
+        "test:types": "tsc --noEmit"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^24.1.0",
+        "@typescript-eslint/eslint-plugin": "^8.44.0",
+        "@typescript-eslint/parser": "^8.44.0",
+        "eslint": "^9.35.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.4",
+        "prettier": "^3.6.2",
+        "tsx": "^4.20.3",
+        "typescript": "^5.8.3"
+    },
+    "type": "module",
+    "license": "Apache-2.0"
+}

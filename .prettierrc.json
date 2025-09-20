@@ -1,0 +1,21 @@
+{
+    "tabWidth": 4,
+    "singleQuote": true,
+    "singleAttributePerLine": false,
+    "semi": true,
+    "resolveGlobalModules": false,
+    "requirePragma": false,
+    "proseWrap": "preserve",
+    "quoteProps": "as-needed",
+    "printWidth": 100,
+    "htmlWhitespaceSensitivity": "css",
+    "endOfLine": "crlf",
+    "enable": true,
+    "embeddedLanguageFormatting": "auto",
+    "bracketSpacing": true,
+    "bracketSameLine": false,
+    "arrowParens": "avoid",
+    "trailingComma": "none",
+    "withNodeModules": false,
+    "useTabs": false
+}
