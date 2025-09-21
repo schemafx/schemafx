@@ -3,13 +3,23 @@ import fastifyHelmet, { type FastifyHelmetOptions } from '@fastify/helmet';
 import fastifyRateLimit, { type FastifyRateLimitOptions } from '@fastify/rate-limit';
 import fastifyJwt, { type FastifyJWTOptions } from '@fastify/jwt';
 import fastifyHealthcheck, { type FastifyHealthcheckOptions } from 'fastify-healthcheck';
+import {
+    serializerCompiler,
+    validatorCompiler,
+    type ZodTypeProvider
+} from 'fastify-type-provider-zod';
 import fastify, {
     type FastifyInstance,
     type FastifyListenOptions,
     type FastifyServerOptions,
     type FastifyRequest,
-    type FastifyReply
+    type FastifyReply,
+    type RawServerDefault,
+    type FastifyBaseLogger
 } from 'fastify';
+import { Connector } from './connector';
+import z from 'zod';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
 export interface SchemaFXOptions {
     /** Optional configuration for Fastify instance. */
@@ -30,20 +40,40 @@ export interface SchemaFXOptions {
         healthcheckOptions?: FastifyHealthcheckOptions;
     };
 
+    /** Connectors to include. */
+    connectors: Connector[];
+
+    /** Default connector to use. */
+    defaultConnector: string;
+
     /** Security secret. */
     secret: string;
 }
 
 export class SchemaFX {
     /** Underlying Fastify instance. */
-    fastifyInstance: FastifyInstance;
+    fastifyInstance: FastifyInstance<
+        RawServerDefault,
+        IncomingMessage,
+        ServerResponse<IncomingMessage>,
+        FastifyBaseLogger,
+        ZodTypeProvider
+    >;
+
+    /** Connector */
+    private connectors: Map<string, Connector>;
+
+    /** Default connector to use. */
+    private defaultConnector: string;
 
     /**
      * Create a SchemaFX instance.
      * @param opts Instance configuration.
      */
     constructor(opts: SchemaFXOptions) {
-        this.fastifyInstance = fastify(opts?.fastifyOptions);
+        this.fastifyInstance = fastify(opts?.fastifyOptions).withTypeProvider<ZodTypeProvider>();
+        this.fastifyInstance.setValidatorCompiler(validatorCompiler);
+        this.fastifyInstance.setSerializerCompiler(serializerCompiler);
         this.fastifyInstance.register(fastifyHelmet, opts.fastifyOptions?.helmetOptions ?? {});
 
         this.fastifyInstance.register(
@@ -102,9 +132,93 @@ export class SchemaFX {
 
             reply.status(500).send({
                 code: 'Internal Server Error',
-                message: 'Unexpected error occurred'
+                message: 'Unexpected error occurred.'
             });
         });
+
+        this.connectors = new Map();
+        this.addConnectors(opts.connectors);
+
+        if (!this.connectors.has(opts.defaultConnector)) {
+            throw new Error(`Default connector "${opts.defaultConnector}" is not registered.`);
+        }
+
+        this.defaultConnector = opts.defaultConnector;
+
+        this.fastifyInstance.get(
+            '/auth/:connectorName/callback',
+            {
+                schema: {
+                    params: z.object({
+                        connectorName: z
+                            .string()
+                            .describe('The name of the OAuth connector (e.g., google, github)')
+                    }),
+                    querystring: z.object({
+                        code: z
+                            .string()
+                            .optional()
+                            .describe('Authorization code returned by provider'),
+                        state: z.string().optional().describe('State parameter for CSRF protection')
+                    }),
+                    response: {
+                        200: z.object({
+                            success: z.boolean(),
+                            message: z.string()
+                        }),
+                        404: z.object({
+                            code: z.string(),
+                            message: z.string()
+                        })
+                    }
+                }
+            },
+            async (request, reply) => {
+                const connector = this.connectors.get(request.params?.connectorName as string);
+                if (typeof connector?.getAuth !== 'function') {
+                    return reply.status(404).send({
+                        code: 'Not Found',
+                        message: 'Connector Not Found.'
+                    });
+                }
+
+                await connector.getAuth((request.query ?? {}) as Record<string, string>);
+                reply.status(200).send({
+                    success: true,
+                    message: `Successfully authenticated with ${connector.name}.`
+                });
+            }
+        );
+    }
+
+    /**
+     * Add data connectors.
+     * @param connectors Connectors to add.
+     */
+    addConnectors(...connectors: (Connector | Connector[])[]) {
+        for (const connector of connectors.flat()) {
+            const name = connector.name;
+
+            if (this.connectors.has(name) && this.connectors.get(name) !== connector) {
+                throw new Error(`A connector has already been registered for "${name}".`);
+            }
+
+            this.connectors.set(name, connector);
+        }
+
+        return this;
+    }
+
+    /**
+     * Remove data connectors.
+     * @param connectors Connectors to remove.
+     */
+    removeConnectors(...connectors: (string | string[])[]) {
+        for (const connector of connectors.flat()) {
+            this.connectors.delete(connector);
+        }
+
+        return this;
     }
 
     /**
