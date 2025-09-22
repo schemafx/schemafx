@@ -16,9 +16,7 @@ export default [
             ...tsPlugin.configs.recommended.rules,
             'prettier/prettier': [
                 'error',
-                Object.assign(await prettier.resolveConfig(path.resolve('./.prettierrc.json')), {
-                    endOfLine: 'auto'
-                })
+                await prettier.resolveConfig(path.resolve('./.prettierrc.json'))
             ],
             ...prettierPlugin.configs.recommended.rules
         }
