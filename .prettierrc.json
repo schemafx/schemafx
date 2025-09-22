@@ -9,7 +9,7 @@
     "quoteProps": "as-needed",
     "printWidth": 100,
     "htmlWhitespaceSensitivity": "css",
-    "endOfLine": "crlf",
+    "endOfLine": "auto",
     "enable": true,
     "embeddedLanguageFormatting": "auto",
     "bracketSpacing": true,
