@@ -56,64 +56,85 @@ export class Connector {
     /**
      * Create a table.
      * @param table Table to create.
+     * @param connectionPayload Connection payload for auth.
      * @returns Created table.
      */
-    createTable?(table: TableDefinition): Promise<TableDefinition>;
+    createTable?(
+        table: TableDefinition,
+        connectionPayload: Record<string, string>
+    ): Promise<TableDefinition>;
 
     /**
      * Update a table.
      * @param oldTable Table to update.
      * @param newTable Updated Table.
+     * @param connectionPayload Connection payload for auth.
      * @returns Updated table.
      */
-    updateTable?(oldTable: TableDefinition, newTable: TableDefinition): Promise<TableDefinition>;
+    updateTable?(
+        oldTable: TableDefinition,
+        newTable: TableDefinition,
+        connectionPayload: Record<string, string>
+    ): Promise<TableDefinition>;
 
     /**
      * Delete a table.
      * @param table Table to delete.
+     * @param connectionPayload Connection payload for auth.
      * @returns Deleted table.
      */
-    deleteTable?(table: TableDefinition): Promise<TableDefinition>;
+    deleteTable?(
+        table: TableDefinition,
+        connectionPayload: Record<string, string>
+    ): Promise<TableDefinition>;
 
     /**
      * Read data from tables.
      * @param tables Tables to read.
+     * @param connectionPayload Connection payload for auth.
      * @returns Rows detail.
      */
     readData?(
-        tables: TableDefinition[]
+        tables: TableDefinition[],
+        connectionPayload: Record<string, string>
     ): Promise<{ table: TableDefinition; rows: Record<string, unknown>[] }[]>;
 
     /**
      * Append data to the table.
      * @param table Table to append data into.
      * @param rows Rows to append.
+     * @param connectionPayload Connection payload for auth.
      * @returns Resulting rows.
      */
     createData?(
         table: TableDefinition,
-        rows: Record<string, unknown>[]
+        rows: Record<string, unknown>[],
+        connectionPayload: Record<string, string>
     ): Promise<Record<string, unknown>[]>;
 
     /**
      * Update data in the table.
      * @param table Table to update data into.
      * @param rows Rows to update.
+     * @param connectionPayload Connection payload for auth.
      * @returns Resulting rows.
      */
     updateData?(
         table: TableDefinition,
-        rows: Record<string, unknown>[]
+        rows: Record<string, unknown>[],
+        connectionPayload: Record<string, string>
     ): Promise<Record<string, unknown>[]>;
 
     /**
      * Delete data from the table.
      * @param table Table to delete data from.
      * @param rows Rows to delete.
+     * @param connectionPayload Connection payload for auth.
      * @returns Deleted rows.
      */
     deleteData?(
         table: TableDefinition,
-        rows: Record<string, unknown>[]
+        rows: Record<string, unknown>[],
+        connectionPayload: Record<string, string>
     ): Promise<Record<string, unknown>[]>;
 }

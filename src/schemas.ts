@@ -13,9 +13,7 @@ export const TableDefinitionSchema = z.object({
 
     connector: z.string(),
     connection: z.string(),
-    connectionPayload: z.looseObject({}),
     connectionPath: z.array(z.string()),
-    connectionTimeZone: z.string(),
 
     columns: z.array(TableColumnDefinitionSchema)
 });
