@@ -2,7 +2,7 @@ import z from 'zod';
 
 export const TableColumnDefinitionSchema = z.object({
     name: z.string(),
-    type: z.enum(['string', 'number', 'date', 'datetime']),
+    type: z.enum(['string', 'number', 'date', 'datetime', 'json']),
     key: z.boolean().default(false)
 });
 
