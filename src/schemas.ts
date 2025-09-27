@@ -11,13 +11,13 @@ export enum TableColumnType {
 }
 
 const TableColumnDefinitionSchemaTypeProps: z.ZodType<unknown> = z.lazy(() =>
-    z.object({
+    z.strictObject({
         type: z.enum(Object.values(TableColumnType)).default(TableColumnType.String),
         typeProps: TableColumnDefinitionSchemaTypeProps.optional()
     })
 );
 
-export const TableColumnDefinitionSchema = z.object({
+export const TableColumnDefinitionSchema = z.strictObject({
     name: z.string(),
     type: z.enum(Object.values(TableColumnType)).default(TableColumnType.String),
     typeProps: TableColumnDefinitionSchemaTypeProps.optional(),
@@ -26,7 +26,7 @@ export const TableColumnDefinitionSchema = z.object({
 
 export type TableColumnDefinition = z.infer<typeof TableColumnDefinitionSchema>;
 
-export const TableDefinitionSchema = z.object({
+export const TableDefinitionSchema = z.strictObject({
     name: z.string(),
 
     connector: z.string(),
