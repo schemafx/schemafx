@@ -1,8 +1,8 @@
-import type { TableDefinition, TableColumnDefinition } from './schemas';
-export { TableDefinition, TableColumnDefinition };
+import { type TableDefinition, type TableColumnDefinition, TableColumnType } from './schemas';
+export { TableDefinition, TableColumnDefinition, TableColumnType };
 
-import { Connector } from './connector';
-export { Connector };
+import { Connector, ConnectorAuthType, ConnectorAuthPropType } from './connector';
+export { Connector, ConnectorAuthType, ConnectorAuthPropType };
 
 import { SchemaFX, type SchemaFXOptions } from './core';
 export { SchemaFXOptions };

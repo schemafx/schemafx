@@ -1,14 +1,29 @@
 import type { TableDefinition } from './schemas';
 
+export enum ConnectorAuthType {
+    OAuth = 'OAuth',
+    Basic = 'Basic',
+    None = 'None'
+}
+
+export enum ConnectorAuthPropType {
+    Text = 'Text',
+    Password = 'Password',
+    Number = 'Number'
+}
+
 export class Connector {
     /** Name of the connector. */
     name: string;
 
     /** Authentication type. */
-    authType: 'OAuth' | 'Basic' | 'None' = 'None';
+    authType: ConnectorAuthType = ConnectorAuthType.None;
 
     /** Authentication properties for Basic only. */
-    authProps?: Record<string, 'Text' | 'Password' | 'Number'>;
+    authProps?: Record<
+        string,
+        ConnectorAuthPropType | { type: ConnectorAuthPropType; required: boolean }
+    >;
 
     /**
      * Build With Your Data.
