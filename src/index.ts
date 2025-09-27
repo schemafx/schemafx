@@ -1,8 +1,14 @@
 import { type TableDefinition, type TableColumnDefinition, TableColumnType } from './schemas';
-export { TableDefinition, TableColumnDefinition, TableColumnType };
+export { TableDefinition, TableColumnDefinition };
 
 import { Connector, ConnectorAuthType, ConnectorAuthPropType } from './connector';
-export { Connector, ConnectorAuthType, ConnectorAuthPropType };
+export { Connector };
+
+export const Types = {
+    TableColumnType,
+    ConnectorAuthType,
+    ConnectorAuthPropType
+};
 
 import { SchemaFX, type SchemaFXOptions } from './core';
 export { SchemaFXOptions };
