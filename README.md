@@ -16,7 +16,6 @@ import SchemaFX from 'schemafx';
 new SchemaFX({
     fastifyOptions: { /* ... */},
     connectors: [ /* ... */ ],
-    defaultConnector: '',
     secret: ''
 })
 ```

@@ -43,9 +43,6 @@ export interface SchemaFXOptions {
     /** Connectors to include. */
     connectors: Connector[];
 
-    /** Default connector to use. */
-    defaultConnector: string;
-
     /** Security secret. */
     secret: string;
 }
@@ -62,9 +59,6 @@ export class SchemaFX {
 
     /** Connector */
     private connectors: Map<string, Connector>;
-
-    /** Default connector to use. */
-    private defaultConnector: string;
 
     /**
      * Create a SchemaFX instance.
@@ -138,12 +132,6 @@ export class SchemaFX {
 
         this.connectors = new Map();
         this.addConnectors(opts.connectors);
-
-        if (!this.connectors.has(opts.defaultConnector)) {
-            throw new Error(`Default connector "${opts.defaultConnector}" is not registered.`);
-        }
-
-        this.defaultConnector = opts.defaultConnector;
 
         this.fastifyInstance.get(
             '/auth/:connectorName/callback',
