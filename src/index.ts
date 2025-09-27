@@ -1,6 +1,9 @@
 import { type TableDefinition, type TableColumnDefinition, TableColumnType } from './schemas';
 export { TableDefinition, TableColumnDefinition };
 
+import { zodToTableColumns } from './utils/zodToTableColumns';
+export const utils = { zodToTableColumns };
+
 import { Connector, ConnectorAuthType, ConnectorAuthPropType } from './connector';
 export { Connector };
 
