@@ -1,8 +1,26 @@
 import z from 'zod';
 
+export enum TableColumnType {
+    String = 'string',
+    Number = 'number',
+    Boolean = 'boolean',
+    Date = 'date',
+    DateTime = 'datetime',
+    Json = 'json',
+    Array = 'array'
+}
+
+const TableColumnDefinitionSchemaTypeProps: z.ZodType<unknown> = z.lazy(() =>
+    z.object({
+        type: z.enum(Object.values(TableColumnType)).default(TableColumnType.String),
+        typeProps: TableColumnDefinitionSchemaTypeProps.optional()
+    })
+);
+
 export const TableColumnDefinitionSchema = z.object({
     name: z.string(),
-    type: z.enum(['string', 'number', 'date', 'datetime', 'json']),
+    type: z.enum(Object.values(TableColumnType)).default(TableColumnType.String),
+    typeProps: TableColumnDefinitionSchemaTypeProps.optional(),
     key: z.boolean().default(false)
 });
 
