@@ -10,9 +10,17 @@ export enum TableColumnType {
     Array = 'array'
 }
 
+const TableColumnDefinitionSchemaTypeProps: z.ZodType<unknown> = z.lazy(() =>
+    z.object({
+        type: z.enum(Object.values(TableColumnType)).default(TableColumnType.String),
+        typeProps: TableColumnDefinitionSchemaTypeProps.optional()
+    })
+);
+
 export const TableColumnDefinitionSchema = z.object({
     name: z.string(),
     type: z.enum(Object.values(TableColumnType)).default(TableColumnType.String),
+    typeProps: TableColumnDefinitionSchemaTypeProps.optional(),
     key: z.boolean().default(false)
 });
 
