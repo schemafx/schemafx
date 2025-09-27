@@ -20,6 +20,21 @@ import fastify, {
 import { Connector } from './connector';
 import z from 'zod';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import {
+    ComponentSchema,
+    ConnectionSchema,
+    EntitySchema,
+    RoleSchema,
+    type TableDefinition,
+    TableDefinitionSchema
+} from './schemas';
+import { zodToTableColumns } from './utils/zodToTableColumns';
+
+interface SchemaFXDBOption {
+    connector: string;
+    connectionPath: string[];
+    connectionPayload: Record<string, unknown>;
+}
 
 export interface SchemaFXOptions {
     /** Optional configuration for Fastify instance. */
@@ -40,11 +55,26 @@ export interface SchemaFXOptions {
         healthcheckOptions?: FastifyHealthcheckOptions;
     };
 
+    /** Configuration for system tables. */
+    dbOptions: {
+        /** Configuration for the tables DB. */
+        tables: SchemaFXDBOption;
+
+        /** Configuration for the entities DB. */
+        entities: SchemaFXDBOption;
+
+        /** Configuration for the components DB. */
+        components: SchemaFXDBOption;
+
+        /** Configuration for the connections DB. */
+        connections: SchemaFXDBOption;
+
+        /** Configuration for the roles DB. */
+        roles: SchemaFXDBOption;
+    };
+
     /** Connectors to include. */
     connectors: Connector[];
-
-    /** Default connector to use. */
-    defaultConnector: string;
 
     /** Security secret. */
     secret: string;
@@ -60,11 +90,26 @@ export class SchemaFX {
         ZodTypeProvider
     >;
 
+    /** Table definition for tables. */
+    private tablesTable: TableDefinition;
+
+    /** Table definition for entities. */
+    private entitiesTable: TableDefinition;
+
+    /** Table definition for components. */
+    private componentsTable: TableDefinition;
+
+    /** Table definition for connections. */
+    private connectionsTable: TableDefinition;
+
+    /** Table definition for roles. */
+    private rolesTable: TableDefinition;
+
+    /** Connection payload for system tables */
+    private tablePayload: Map<string, Record<string, unknown>>;
+
     /** Connector */
     private connectors: Map<string, Connector>;
-
-    /** Default connector to use. */
-    private defaultConnector: string;
 
     /**
      * Create a SchemaFX instance.
@@ -139,12 +184,6 @@ export class SchemaFX {
         this.connectors = new Map();
         this.addConnectors(opts.connectors);
 
-        if (!this.connectors.has(opts.defaultConnector)) {
-            throw new Error(`Default connector "${opts.defaultConnector}" is not registered.`);
-        }
-
-        this.defaultConnector = opts.defaultConnector;
-
         this.fastifyInstance.get(
             '/auth/:connectorName/callback',
             {
@@ -189,6 +228,63 @@ export class SchemaFX {
                 });
             }
         );
+
+        this.tablePayload = new Map();
+
+        this.tablePayload.set('tables', opts.dbOptions.tables.connectionPayload);
+        this.tablesTable = {
+            id: '',
+            name: 'tables',
+            entity: '',
+            connection: '',
+            connector: opts.dbOptions.tables.connector,
+            connectionPath: opts.dbOptions.tables.connectionPath,
+            columns: zodToTableColumns(TableDefinitionSchema)
+        };
+
+        this.tablePayload.set('entities', opts.dbOptions.entities.connectionPayload);
+        this.entitiesTable = {
+            id: '',
+            name: 'entities',
+            entity: '',
+            connection: '',
+            connector: opts.dbOptions.entities.connector,
+            connectionPath: opts.dbOptions.entities.connectionPath,
+            columns: zodToTableColumns(EntitySchema)
+        };
+
+        this.tablePayload.set('components', opts.dbOptions.components.connectionPayload);
+        this.componentsTable = {
+            id: '',
+            name: 'components',
+            entity: '',
+            connection: '',
+            connector: opts.dbOptions.components.connector,
+            connectionPath: opts.dbOptions.components.connectionPath,
+            columns: zodToTableColumns(ComponentSchema)
+        };
+
+        this.tablePayload.set('connections', opts.dbOptions.connections.connectionPayload);
+        this.connectionsTable = {
+            id: '',
+            name: 'connections',
+            entity: '',
+            connection: '',
+            connector: opts.dbOptions.connections.connector,
+            connectionPath: opts.dbOptions.connections.connectionPath,
+            columns: zodToTableColumns(ConnectionSchema)
+        };
+
+        this.tablePayload.set('roles', opts.dbOptions.roles.connectionPayload);
+        this.rolesTable = {
+            id: '',
+            name: 'roles',
+            entity: '',
+            connection: '',
+            connector: opts.dbOptions.roles.connector,
+            connectionPath: opts.dbOptions.roles.connectionPath,
+            columns: zodToTableColumns(RoleSchema)
+        };
     }
 
     /**

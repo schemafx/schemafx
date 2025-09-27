@@ -14,9 +14,9 @@ npm install schemafx
 import SchemaFX from 'schemafx';
 
 new SchemaFX({
+    dbOptions: { /* ... */ },
     fastifyOptions: { /* ... */},
     connectors: [ /* ... */ ],
-    defaultConnector: '',
     secret: ''
 })
 ```
