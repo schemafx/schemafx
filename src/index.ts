@@ -4,7 +4,7 @@ export { TableDefinition, TableColumnDefinition };
 import { Connector, ConnectorAuthType, ConnectorAuthPropType } from './connector';
 export { Connector };
 
-export const Types = {
+export const Enums = {
     TableColumnType,
     ConnectorAuthType,
     ConnectorAuthPropType
