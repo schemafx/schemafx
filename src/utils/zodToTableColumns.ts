@@ -39,7 +39,7 @@ function parseZodDef(def?: Record<string, unknown>): {
         case 'optional':
             return parseZodDef(def?.innerType as Record<string, unknown>);
         case 'lazy':
-            const getter = (def?.def as Record<string, unknown>)?.getter;
+            const getter = (def as Record<string, unknown>)?.getter;
             const obj = typeof getter === 'function' ? getter() : {};
 
             // Resolve non-object and array to avoid loops.
