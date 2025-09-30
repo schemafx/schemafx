@@ -222,7 +222,7 @@ export class SchemaFX {
                 }
 
                 await connector.getAuth((request.query ?? {}) as Record<string, string>);
-                reply.status(200).send({
+                return reply.status(200).send({
                     success: true,
                     message: `Successfully authenticated with ${connector.name}.`
                 });
