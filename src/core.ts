@@ -33,7 +33,7 @@ import { zodToTableColumns } from './utils/zodToTableColumns';
 interface SchemaFXDBOption {
     connector: string;
     connectionPath: string[];
-    connectionPayload: Record<string, unknown>;
+    connectionPayload?: Record<string, unknown>;
 }
 
 export interface SchemaFXOptions {
@@ -231,7 +231,7 @@ export class SchemaFX {
 
         this.tablePayload = new Map();
 
-        this.tablePayload.set('tables', opts.dbOptions.tables.connectionPayload);
+        this.tablePayload.set('tables', opts.dbOptions.tables.connectionPayload || {});
         this.tablesTable = {
             id: '',
             name: 'tables',
@@ -242,7 +242,7 @@ export class SchemaFX {
             columns: zodToTableColumns(TableDefinitionSchema)
         };
 
-        this.tablePayload.set('entities', opts.dbOptions.entities.connectionPayload);
+        this.tablePayload.set('entities', opts.dbOptions.entities.connectionPayload || {});
         this.entitiesTable = {
             id: '',
             name: 'entities',
@@ -253,7 +253,7 @@ export class SchemaFX {
             columns: zodToTableColumns(EntitySchema)
         };
 
-        this.tablePayload.set('components', opts.dbOptions.components.connectionPayload);
+        this.tablePayload.set('components', opts.dbOptions.components.connectionPayload || {});
         this.componentsTable = {
             id: '',
             name: 'components',
@@ -264,7 +264,7 @@ export class SchemaFX {
             columns: zodToTableColumns(ComponentSchema)
         };
 
-        this.tablePayload.set('connections', opts.dbOptions.connections.connectionPayload);
+        this.tablePayload.set('connections', opts.dbOptions.connections.connectionPayload || {});
         this.connectionsTable = {
             id: '',
             name: 'connections',
@@ -275,7 +275,7 @@ export class SchemaFX {
             columns: zodToTableColumns(ConnectionSchema)
         };
 
-        this.tablePayload.set('roles', opts.dbOptions.roles.connectionPayload);
+        this.tablePayload.set('roles', opts.dbOptions.roles.connectionPayload || {});
         this.rolesTable = {
             id: '',
             name: 'roles',
