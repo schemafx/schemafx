@@ -47,6 +47,12 @@ export class Connector {
     getAuthUrl?(): string;
 
     /**
+     * Validate the authentication details.
+     * @returns Whether authentication was successful.
+     */
+    validateAuth?(connectionPayload: Record<string, string>): Promise<boolean>;
+
+    /**
      * Read available tables.
      * @param connectionPath Connection path to explore.
      * @param connectionPayload Connection payload for auth.

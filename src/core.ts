@@ -17,18 +17,29 @@ import fastify, {
     type RawServerDefault,
     type FastifyBaseLogger
 } from 'fastify';
-import { Connector } from './connector';
+import type { Connector } from './connector';
 import z from 'zod';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
+    AuthPayloadKeys,
     ComponentSchema,
+    type Connection,
     ConnectionSchema,
+    type Entity,
     EntitySchema,
+    EntityType,
+    type Role,
+    RoleGrants,
     RoleSchema,
+    RoleTargetType,
     type TableDefinition,
     TableDefinitionSchema
 } from './schemas';
 import { zodToTableColumns } from './utils/zodToTableColumns';
+import authPropToZod from './utils/authPropToZod';
+import { ulid } from 'ulid';
+import { decrypt, encrypt } from './utils/crypto';
+import containsAll from './utils/containsAll';
 
 interface SchemaFXDBOption {
     connector: string;
@@ -80,7 +91,23 @@ export interface SchemaFXOptions {
     secret: string;
 }
 
+declare module 'fastify' {
+    interface FastifyInstance {
+        authenticate: (request: FastifyRequest) => Promise<void>;
+        authorize: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    }
+}
+
+declare module '@fastify/jwt' {
+    interface FastifyJWT {
+        payload: { id: string };
+        user: { id: string };
+    }
+}
+
 export class SchemaFX {
+    [key: string]: unknown;
+
     /** Underlying Fastify instance. */
     fastifyInstance: FastifyInstance<
         RawServerDefault,
@@ -91,19 +118,19 @@ export class SchemaFX {
     >;
 
     /** Table definition for tables. */
-    private tablesTable: TableDefinition;
+    private tablesTable!: TableDefinition;
 
     /** Table definition for entities. */
-    private entitiesTable: TableDefinition;
+    private entitiesTable!: TableDefinition;
 
     /** Table definition for components. */
-    private componentsTable: TableDefinition;
+    private componentsTable!: TableDefinition;
 
     /** Table definition for connections. */
-    private connectionsTable: TableDefinition;
+    private connectionsTable!: TableDefinition;
 
     /** Table definition for roles. */
-    private rolesTable: TableDefinition;
+    private rolesTable!: TableDefinition;
 
     /** Connection payload for system tables */
     private tablePayload: Map<string, Record<string, unknown>>;
@@ -111,11 +138,16 @@ export class SchemaFX {
     /** Connector */
     private connectors: Map<string, Connector>;
 
+    /** Secret. */
+    private secret: string;
+
     /**
      * Create a SchemaFX instance.
      * @param opts Instance configuration.
      */
     constructor(opts: SchemaFXOptions) {
+        this.secret = opts.secret;
+
         this.fastifyInstance = fastify(opts?.fastifyOptions).withTypeProvider<ZodTypeProvider>();
         this.fastifyInstance.setValidatorCompiler(validatorCompiler);
         this.fastifyInstance.setSerializerCompiler(serializerCompiler);
@@ -155,14 +187,15 @@ export class SchemaFX {
             }
         );
 
+        this.fastifyInstance.decorate('authenticate', async (request: FastifyRequest) => {
+            await request.jwtVerify().catch(() => undefined);
+        });
+
         this.fastifyInstance.decorate(
-            'authenticate',
+            'authorize',
             async (request: FastifyRequest, reply: FastifyReply) => {
-                try {
-                    await request.jwtVerify();
-                } catch (err) {
-                    this.fastifyInstance.log.error(err);
-                    reply.code(401).send({ error: 'Unauthorized.' });
+                if (!request.user.id) {
+                    return reply.code(401).send({ error: 'Unauthorized.' });
                 }
             }
         );
@@ -187,6 +220,7 @@ export class SchemaFX {
         this.fastifyInstance.get(
             '/auth/:connectorName/callback',
             {
+                onRequest: [this.fastifyInstance.authenticate],
                 schema: {
                     params: z.object({
                         connectorName: z
@@ -203,6 +237,11 @@ export class SchemaFX {
                     response: {
                         200: z.object({
                             success: z.boolean(),
+                            message: z.string(),
+                            token: z.string().optional()
+                        }),
+                        403: z.object({
+                            code: z.string(),
                             message: z.string()
                         }),
                         404: z.object({
@@ -221,8 +260,177 @@ export class SchemaFX {
                     });
                 }
 
-                await connector.getAuth((request.query ?? {}) as Record<string, string>);
-                reply.status(200).send({
+                const authPayload = await connector.getAuth(
+                    (request.query ?? {}) as Record<string, string>
+                );
+
+                let token: string | undefined;
+                if (!request.user) {
+                    const userEmail = authPayload[AuthPayloadKeys.Email];
+                    if (!userEmail) {
+                        return reply.status(403).send({
+                            code: 'Forbidden',
+                            message: 'Insufficient Permissions.'
+                        });
+                    }
+
+                    const entitiesConnectorName = this.entitiesTable.connector;
+                    const entitiesConnector = this.connectors.get(entitiesConnectorName)!;
+
+                    const entities = await entitiesConnector.readData!(
+                        [this.entitiesTable],
+                        this.tablePayload.get('entities') as Record<string, string>
+                    );
+
+                    let user: Entity | undefined = (entities[0].rows as Entity[]).find(
+                        e => e.type === EntityType.User && e.name === userEmail
+                    );
+
+                    if (!user) {
+                        user = {
+                            id: ulid(),
+                            name: userEmail,
+                            type: EntityType.User
+                        };
+
+                        await entitiesConnector.createData!(
+                            this.entitiesTable,
+                            [user],
+                            this.tablePayload.get('entities') as Record<string, string>
+                        );
+                    }
+
+                    request.user = { id: user.id };
+                    token = await reply.jwtSign(request.user);
+                }
+
+                await this.saveCredentials(request.user.id, authPayload);
+
+                return reply.status(200).send({
+                    success: true,
+                    message: `Successfully authenticated with ${connector.name}.`,
+                    ...(token ? { token } : {})
+                });
+            }
+        );
+
+        this.fastifyInstance.get(
+            '/auth/:connectorName/connect',
+            {
+                onRequest: [this.fastifyInstance.authenticate],
+                schema: {
+                    params: z.object({
+                        connectorName: z
+                            .string()
+                            .describe('The name of the OAuth connector (e.g., google, github)')
+                    }),
+                    response: {
+                        302: z.undefined(),
+                        404: z.object({
+                            code: z.string(),
+                            message: z.string()
+                        })
+                    }
+                }
+            },
+            async (request, reply) => {
+                const connector = this.connectors.get(request.params?.connectorName as string);
+                if (typeof connector?.getAuthUrl !== 'function') {
+                    return reply.status(404).send({
+                        code: 'Not Found',
+                        message: 'Connector Not Found.'
+                    });
+                }
+
+                return reply.redirect(connector.getAuthUrl(), 302);
+            }
+        );
+
+        this.fastifyInstance.post(
+            '/auth/:connectorName/connect',
+            {
+                onRequest: [this.fastifyInstance.authenticate, this.fastifyInstance.authorize],
+                schema: {
+                    params: z.object({
+                        connectorName: z
+                            .string()
+                            .describe('The name of the OAuth connector (e.g., google, github)')
+                    }),
+                    body: z.looseObject({}),
+                    response: {
+                        200: z.object({
+                            success: z.boolean(),
+                            message: z.string()
+                        }),
+                        400: z.object({
+                            error: z.string(),
+                            message: z.string(),
+                            details: z
+                                .array(
+                                    z.object({
+                                        field: z.string(),
+                                        message: z.string(),
+                                        code: z.string()
+                                    })
+                                )
+                                .optional()
+                        }),
+                        404: z.object({
+                            code: z.string(),
+                            message: z.string()
+                        })
+                    }
+                }
+            },
+            async (request, reply) => {
+                const connector = this.connectors.get(request.params?.connectorName as string);
+                if (
+                    !connector ||
+                    !connector?.authProps ||
+                    !Object.keys(connector.authProps).length
+                ) {
+                    return reply.status(404).send({
+                        code: 'Not Found',
+                        message: 'Connector Not Found.'
+                    });
+                }
+
+                const result = z
+                    .strictObject(
+                        Object.fromEntries(
+                            Object.entries(connector.authProps).map(e => [
+                                e[0],
+                                authPropToZod(e[1])
+                            ])
+                        )
+                    )
+                    .safeParse(request.body);
+
+                if (!result.success) {
+                    return reply.code(400).send({
+                        error: 'Validation Error',
+                        message: 'Invalid input data',
+                        details: result.error.issues.map(err => ({
+                            field: err.path.join('.'),
+                            message: err.message,
+                            code: err.code
+                        }))
+                    });
+                }
+
+                if (typeof connector.validateAuth === 'function') {
+                    if (!(await connector.validateAuth(result.data as Record<string, string>))) {
+                        return reply.code(400).send({
+                            error: 'Validation Error',
+                            message: 'Unable to connect.'
+                        });
+                    }
+                }
+
+                // TODO: Have proper owner id.
+                await this.saveCredentials(request.user.id, result.data as Record<string, string>);
+
+                return reply.status(200).send({
                     success: true,
                     message: `Successfully authenticated with ${connector.name}.`
                 });
@@ -230,61 +438,161 @@ export class SchemaFX {
         );
 
         this.tablePayload = new Map();
+        this.parseTable('tables', opts.dbOptions.tables, TableDefinitionSchema);
+        this.parseTable('entities', opts.dbOptions.entities, EntitySchema);
+        this.parseTable('components', opts.dbOptions.components, ComponentSchema);
+        this.parseTable('connections', opts.dbOptions.connections, ConnectionSchema);
+        this.parseTable('roles', opts.dbOptions.roles, RoleSchema);
+    }
 
-        this.tablePayload.set('tables', opts.dbOptions.tables.connectionPayload || {});
-        this.tablesTable = {
+    /**
+     * Parse system table.
+     * @param table Table used for definition.
+     * @param tableProp Table property on SchemaFX.
+     * @param opts DB Options.
+     * @param schema ZodSchema for Table definition.
+     */
+    private parseTable(table: string, opts: SchemaFXDBOption, schema: z.ZodObject) {
+        if (!opts) {
+            throw new Error(`No DB options provided for ${table}.`);
+        }
+
+        this.tablePayload.set(table, opts.connectionPayload || {});
+        this[`${table}Table`] = {
             id: '',
-            name: 'tables',
+            name: table,
             entity: '',
             connection: '',
-            connector: opts.dbOptions.tables.connector,
-            connectionPath: opts.dbOptions.tables.connectionPath,
-            columns: zodToTableColumns(TableDefinitionSchema)
+            connector: opts.connector,
+            connectionPath: opts.connectionPath,
+            columns: zodToTableColumns(schema)
+        };
+    }
+
+    /**
+     * Save credentials.
+     * @param owner Id of the owner.
+     * @param connectionPayload Connection data to save.
+     */
+    private async saveCredentials(owner: string, connectionPayload: Record<string, string>) {
+        const connectionsConnectorName = this.connectionsTable.connector;
+        const connectionsConnector = this.connectors.get(connectionsConnectorName)!;
+
+        const rolesConnectorName = this.rolesTable.connector;
+        const rolesConnector = this.connectors.get(rolesConnectorName)!;
+
+        const connection = {
+            id: ulid(),
+            connector: connectionsConnectorName,
+            connection_payload: encrypt(JSON.stringify(connectionPayload), this.secret)
         };
 
-        this.tablePayload.set('entities', opts.dbOptions.entities.connectionPayload || {});
-        this.entitiesTable = {
-            id: '',
-            name: 'entities',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.entities.connector,
-            connectionPath: opts.dbOptions.entities.connectionPath,
-            columns: zodToTableColumns(EntitySchema)
-        };
+        await connectionsConnector.createData!(
+            this.connectionsTable,
+            [connection],
+            (this.tablePayload.get('connections') ?? {}) as Record<string, string>
+        );
 
-        this.tablePayload.set('components', opts.dbOptions.components.connectionPayload || {});
-        this.componentsTable = {
-            id: '',
-            name: 'components',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.components.connector,
-            connectionPath: opts.dbOptions.components.connectionPath,
-            columns: zodToTableColumns(ComponentSchema)
-        };
+        await rolesConnector.createData!(
+            this.rolesTable,
+            [
+                {
+                    id: ulid(),
+                    entity: owner,
+                    grants: [RoleGrants.Owner],
+                    target_type: RoleTargetType.Connection,
+                    target_id: connection.id
+                }
+            ],
+            (this.tablePayload.get('roles') ?? {}) as Record<string, string>
+        );
 
-        this.tablePayload.set('connections', opts.dbOptions.connections.connectionPayload || {});
-        this.connectionsTable = {
-            id: '',
-            name: 'connections',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.connections.connector,
-            connectionPath: opts.dbOptions.connections.connectionPath,
-            columns: zodToTableColumns(ConnectionSchema)
-        };
+        return connection.id;
+    }
 
-        this.tablePayload.set('roles', opts.dbOptions.roles.connectionPayload || {});
-        this.rolesTable = {
-            id: '',
-            name: 'roles',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.roles.connector,
-            connectionPath: opts.dbOptions.roles.connectionPath,
-            columns: zodToTableColumns(RoleSchema)
-        };
+    /**
+     * Retrieve a connection's details.
+     * @param context Context for permissions.
+     * @param connection Connection to retrieve.
+     * @returns The connection details, if available.
+     */
+    private async getConnection(context: string, connection: string) {
+        if (!this.hasGrant(RoleGrants.Read, context, connection)) {
+            return;
+        }
+
+        const connectionsConnectorName = this.connectionsTable.connector;
+        const connectionsConnector = this.connectors.get(connectionsConnectorName)!;
+
+        const connections = await connectionsConnector.readData!(
+            [this.connectionsTable],
+            this.tablePayload.get('connections') as Record<string, string>
+        );
+
+        const payload = (connections[0].rows as Connection[]).find(r => r.id === connection);
+
+        if (!payload?.connection_payload) {
+            return;
+        }
+
+        const decrypted = decrypt(payload.connection_payload, this.secret);
+        if (typeof decrypted !== 'string') {
+            return;
+        }
+
+        return JSON.parse(decrypted) as Record<string, string>;
+    }
+
+    /**
+     * Whether a context has grants.
+     * @param grant Grant(s) to look for.
+     * @param context Context to use.
+     * @param target Target to find.
+     * @returns Whether the context has grants.
+     */
+    private async hasGrant(grant: RoleGrants | RoleGrants[], context: string, target: string) {
+        const grants: RoleGrants[] = Array.isArray(grant) ? grant : [grant];
+        console.log(target);
+
+        const rolesConnectorName = this.rolesTable.connector;
+        const rolesConnector = this.connectors.get(rolesConnectorName)!;
+
+        const roles = (
+            await rolesConnector.readData!(
+                [this.rolesTable],
+                this.tablePayload.get('roles') as Record<string, string>
+            )
+        )[0].rows as Role[];
+
+        let possibleRoles: Role[] = [];
+        let validGrants: string[] = [];
+
+        for (const role of roles) {
+            if (role.target_id === target) {
+                if (role.grants.includes(RoleGrants.Owner) || containsAll(grants, role.grants)) {
+                    validGrants.push(role.entity);
+                }
+
+                continue;
+            } else if (role.target_type === RoleTargetType.Connection) {
+                // No sub-permission for that type.
+                continue;
+            }
+
+            possibleRoles.push(role);
+        }
+
+        while (validGrants.length) {
+            if (validGrants.includes(context)) {
+                return true;
+            }
+
+            validGrants = possibleRoles
+                .filter(r => validGrants.includes(r.target_id))
+                .map(r => r.entity);
+        }
+
+        return false;
     }
 
     /**
