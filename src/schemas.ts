@@ -1,5 +1,10 @@
 import z from 'zod';
 
+export enum AuthPayloadKeys {
+    Email = '_verifiedEmail',
+    Name = '_verifiedName'
+}
+
 export enum TableColumnType {
     String = 'string',
     Number = 'number',

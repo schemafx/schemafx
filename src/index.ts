@@ -1,5 +1,10 @@
-import { type TableDefinition, type TableColumnDefinition, TableColumnType } from './schemas';
-export { TableDefinition, TableColumnDefinition, TableColumnType };
+import {
+    type TableDefinition,
+    type TableColumnDefinition,
+    AuthPayloadKeys,
+    TableColumnType
+} from './schemas';
+export { TableDefinition, TableColumnDefinition, AuthPayloadKeys, TableColumnType };
 
 import { zodToTableColumns } from './utils/zodToTableColumns';
 export const utils = { zodToTableColumns };
