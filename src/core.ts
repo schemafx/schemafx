@@ -17,7 +17,7 @@ import fastify, {
     type RawServerDefault,
     type FastifyBaseLogger
 } from 'fastify';
-import { Connector } from './connector';
+import type { Connector } from './connector';
 import z from 'zod';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
