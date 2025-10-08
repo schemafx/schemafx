@@ -182,4 +182,50 @@ describe('zodToTableColumns', () => {
     it('should handle empty schemas', () => {
         expect(zodToTableColumns(z.object())).toEqual([]);
     });
+
+    describe('unhandled Zod types', () => {
+        it('should default to string for various unhandled types', () => {
+            const schema = z.object({
+                any: z.any(),
+                unknown: z.unknown(),
+                void: z.void(),
+                tuple: z.tuple([z.string(), z.number()]),
+                union: z.union([z.string(), z.number()]),
+                enum: z.enum(['a', 'b', 'c']),
+                intersection: z.intersection(z.string(), z.number()),
+                map: z.map(z.string(), z.string()),
+                function: z.function(),
+                promise: z.promise(z.string()),
+                null: z.null(),
+                undefined: z.undefined()
+            });
+
+            const cols = zodToTableColumns(schema);
+            expect(cols.length).toBe(12);
+            for (const col of cols) {
+                expect(col.type).toBe(TableColumnType.String);
+            }
+        });
+
+        it('should handle lazy evaluation of non-object/non-array types', () => {
+            const schema = z.object({
+                lazyString: z.lazy(() => z.string())
+            });
+            const cols = zodToTableColumns(schema);
+            expect(cols[0].type).toBe(TableColumnType.String);
+        });
+
+        it('should handle lazy schema with no getter', () => {
+            const lazyWithNoGetter = z.string() as any;
+            lazyWithNoGetter.def.type = 'lazy';
+            delete lazyWithNoGetter.def.getter;
+
+            const schema = z.object({
+                lazy: lazyWithNoGetter
+            });
+
+            const cols = zodToTableColumns(schema);
+            expect(cols[0].type).toBe(TableColumnType.String);
+        });
+    });
 });
