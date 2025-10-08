@@ -81,6 +81,8 @@ export interface SchemaFXOptions {
 }
 
 export class SchemaFX {
+    [key: string]: unknown;
+
     /** Underlying Fastify instance. */
     fastifyInstance: FastifyInstance<
         RawServerDefault,
@@ -91,19 +93,19 @@ export class SchemaFX {
     >;
 
     /** Table definition for tables. */
-    private tablesTable: TableDefinition;
+    private tablesTable!: TableDefinition;
 
     /** Table definition for entities. */
-    private entitiesTable: TableDefinition;
+    private entitiesTable!: TableDefinition;
 
     /** Table definition for components. */
-    private componentsTable: TableDefinition;
+    private componentsTable!: TableDefinition;
 
     /** Table definition for connections. */
-    private connectionsTable: TableDefinition;
+    private connectionsTable!: TableDefinition;
 
     /** Table definition for roles. */
-    private rolesTable: TableDefinition;
+    private rolesTable!: TableDefinition;
 
     /** Connection payload for system tables */
     private tablePayload: Map<string, Record<string, unknown>>;
@@ -230,60 +232,34 @@ export class SchemaFX {
         );
 
         this.tablePayload = new Map();
+        this.parseTable('tables', opts.dbOptions.tables, TableDefinitionSchema);
+        this.parseTable('entities', opts.dbOptions.entities, EntitySchema);
+        this.parseTable('components', opts.dbOptions.components, ComponentSchema);
+        this.parseTable('connections', opts.dbOptions.connections, ConnectionSchema);
+        this.parseTable('roles', opts.dbOptions.roles, RoleSchema);
+    }
 
-        this.tablePayload.set('tables', opts.dbOptions.tables.connectionPayload || {});
-        this.tablesTable = {
+    /**
+     * Parse system table.
+     * @param table Table used for definition.
+     * @param tableProp Table property on SchemaFX.
+     * @param opts DB Options.
+     * @param schema ZodSchema for Table definition.
+     */
+    private parseTable(table: string, opts: SchemaFXDBOption, schema: z.ZodObject) {
+        if (!opts) {
+            throw new Error(`No DB options provided for ${table}.`);
+        }
+
+        this.tablePayload.set(table, opts.connectionPayload || {});
+        this[`${table}Table`] = {
             id: '',
-            name: 'tables',
+            name: table,
             entity: '',
             connection: '',
-            connector: opts.dbOptions.tables.connector,
-            connectionPath: opts.dbOptions.tables.connectionPath,
-            columns: zodToTableColumns(TableDefinitionSchema)
-        };
-
-        this.tablePayload.set('entities', opts.dbOptions.entities.connectionPayload || {});
-        this.entitiesTable = {
-            id: '',
-            name: 'entities',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.entities.connector,
-            connectionPath: opts.dbOptions.entities.connectionPath,
-            columns: zodToTableColumns(EntitySchema)
-        };
-
-        this.tablePayload.set('components', opts.dbOptions.components.connectionPayload || {});
-        this.componentsTable = {
-            id: '',
-            name: 'components',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.components.connector,
-            connectionPath: opts.dbOptions.components.connectionPath,
-            columns: zodToTableColumns(ComponentSchema)
-        };
-
-        this.tablePayload.set('connections', opts.dbOptions.connections.connectionPayload || {});
-        this.connectionsTable = {
-            id: '',
-            name: 'connections',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.connections.connector,
-            connectionPath: opts.dbOptions.connections.connectionPath,
-            columns: zodToTableColumns(ConnectionSchema)
-        };
-
-        this.tablePayload.set('roles', opts.dbOptions.roles.connectionPayload || {});
-        this.rolesTable = {
-            id: '',
-            name: 'roles',
-            entity: '',
-            connection: '',
-            connector: opts.dbOptions.roles.connector,
-            connectionPath: opts.dbOptions.roles.connectionPath,
-            columns: zodToTableColumns(RoleSchema)
+            connector: opts.connector,
+            connectionPath: opts.connectionPath,
+            columns: zodToTableColumns(schema)
         };
     }
 
