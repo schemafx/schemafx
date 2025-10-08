@@ -113,11 +113,16 @@ export class SchemaFX {
     /** Connector */
     private connectors: Map<string, Connector>;
 
+    /** Secret. */
+    private secret: string;
+
     /**
      * Create a SchemaFX instance.
      * @param opts Instance configuration.
      */
     constructor(opts: SchemaFXOptions) {
+        this.secret = opts.secret;
+
         this.fastifyInstance = fastify(opts?.fastifyOptions).withTypeProvider<ZodTypeProvider>();
         this.fastifyInstance.setValidatorCompiler(validatorCompiler);
         this.fastifyInstance.setSerializerCompiler(serializerCompiler);
