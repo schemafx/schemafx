@@ -2,10 +2,10 @@
     "compilerOptions": {
         "composite": true,
         "target": "ES2020",
-        "module": "ESNext",
+        "module": "nodenext",
         "outDir": "./dist",
         "rootDir": "./src",
-        "moduleResolution": "Node",
+        "moduleResolution": "nodenext",
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "strict": true,
@@ -16,6 +16,6 @@
         "typeRoots": ["node_modules/@types"],
         "types": ["node"]
     },
-    "include": ["src"],
+    "include": ["src", "src/**/*.json"],
     "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.ts"]
 }
