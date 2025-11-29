@@ -25,6 +25,7 @@ import {
 
 import 'dotenv/config';
 import z from 'zod';
+import fastifyCors from '@fastify/cors';
 
 const app = fastify({
     logger: true
@@ -33,6 +34,12 @@ const app = fastify({
 // Zod Type Provider
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
+
+app.register(fastifyCors, {
+    origin: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
+});
 
 app.get(
     '/api/apps/:appId/schema',
