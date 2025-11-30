@@ -1,4 +1,5 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyReply } from 'fastify';
 import {
     type AppField,
     AppFieldSchema,
@@ -58,6 +59,33 @@ function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     arr.splice(newIndex, 0, ...old);
     return arr;
 }
+
+const tableQuerySchema = {
+    params: z.object({
+        appId: z.string().min(1),
+        tableId: z.string().min(1)
+    }),
+    response: {
+        200: z.array(AppTableRowSchema),
+        500: z.object({
+            error: z.string(),
+            message: z.string()
+        }),
+        400: z.object({
+            error: z.string(),
+            message: z.string(),
+            details: z
+                .array(
+                    z.object({
+                        field: z.string(),
+                        message: z.string(),
+                        code: z.string()
+                    })
+                )
+                .optional()
+        })
+    }
+};
 
 export type SchemaFXConnectorsOptions = {
     schemaConnector: string;
@@ -266,32 +294,45 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         }
     );
 
+    async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
+        const schema = await sConnector.getSchema!(appId);
+        const table = schema.tables.find(table => table.id === tableId);
+
+        let response;
+        if (!table) {
+            response = reply.code(400).send({
+                error: 'Data Error',
+                message: 'Invalid table.'
+            });
+
+            return { schema, table, response };
+        }
+
+        const connectorName = table.connector;
+        const connector = connectors[connectorName];
+
+        if (!connector) {
+            response = reply.code(500).send({
+                error: 'Data Error',
+                message: 'Invalid connector.'
+            });
+
+            return { schema, table, connectorName, connector, response };
+        }
+
+        return { schema, table, connectorName, connector, success: true };
+    }
+
     fastify.get(
         '/apps/:appId/data/:tableId',
-        {
-            schema: {
-                params: z.object({
-                    appId: z.string().min(1),
-                    tableId: z.string().min(1)
-                }),
-                response: {
-                    200: z.array(AppTableRowSchema)
-                }
-            }
-        },
-        async request => {
+        { schema: tableQuerySchema },
+        async (request, reply) => {
             const { appId, tableId } = request.params;
 
-            const schema = await sConnector.getSchema!(appId);
-            const connectorName = schema.tables.find(table => table.id === tableId)?.connector;
+            const { response, success, connector } = await handleTable(appId, tableId, reply);
+            if (!success) return response;
 
-            if (!connectorName) return;
-
-            const conn = connectors[connectorName];
-
-            if (!conn) return;
-
-            return conn.getData!(appId, tableId);
+            return connector.getData!(appId, tableId);
         }
     );
 
@@ -299,10 +340,6 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         '/apps/:appId/data/:tableId',
         {
             schema: {
-                params: z.object({
-                    appId: z.string().min(1),
-                    tableId: z.string().min(1)
-                }),
                 body: z.discriminatedUnion('action', [
                     z.object({
                         action: z.literal('add'),
@@ -318,34 +355,19 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         rowIndex: z.number().nonnegative()
                     })
                 ]),
-                response: {
-                    200: z.array(AppTableRowSchema),
-                    400: z.object({
-                        error: z.string(),
-                        message: z.string(),
-                        details: z.array(
-                            z.object({
-                                field: z.string(),
-                                message: z.string(),
-                                code: z.string()
-                            })
-                        )
-                    })
-                }
+                ...tableQuerySchema
             }
         },
         async (request, reply) => {
             const { appId, tableId } = request.params;
 
-            const schema = await sConnector.getSchema!(appId);
-            const table = schema.tables.find(table => table.id === tableId);
+            const { response, success, connector, table } = await handleTable(
+                appId,
+                tableId,
+                reply
+            );
 
-            if (!table) return;
-
-            const connectorName = table.connector;
-            const conn = connectors[connectorName];
-
-            if (!conn) return;
+            if (!success) return response;
 
             let row, rowResult;
             switch (request.body.action) {
@@ -365,7 +387,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
-                    return conn.addRow!(appId, tableId, row);
+                    return connector.addRow!(appId, tableId, row);
                 case 'update':
                     row = request.body.row;
                     rowResult = _zodFromTable(table).safeParse(row);
@@ -382,12 +404,12 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
-                    return conn.updateRow!(appId, tableId, request.body.rowIndex, row);
+                    return connector.updateRow!(appId, tableId, request.body.rowIndex, row);
                 case 'delete':
-                    return conn.deleteRow!(appId, tableId, request.body.rowIndex);
+                    return connector.deleteRow!(appId, tableId, request.body.rowIndex);
             }
 
-            return conn.getData!(appId, tableId);
+            return connector.getData!(appId, tableId);
         }
     );
 };
