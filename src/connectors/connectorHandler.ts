@@ -19,10 +19,15 @@ function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     return arr;
 }
 
-const plugin: FastifyPluginAsyncZod<{
+export type SchemaFXConnectorsOptions = {
     schemaConnector: string;
     connectors: Record<string, Connector>;
-}> = async (fastify, { schemaConnector, connectors }) => {
+};
+
+const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
+    fastify,
+    { schemaConnector, connectors }
+) => {
     const sConnector = connectors[schemaConnector];
 
     if (!sConnector) {
