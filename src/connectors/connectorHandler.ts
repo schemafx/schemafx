@@ -353,7 +353,6 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     row = request.body.row;
                     rowResult = _zodFromTable(table).safeParse(row);
 
-                    console.log(row, rowResult);
                     if (!rowResult.success) {
                         return reply.code(400).send({
                             error: 'Validation Error',
@@ -371,7 +370,6 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     row = request.body.row;
                     rowResult = _zodFromTable(table).safeParse(row);
 
-                    console.log(row, rowResult);
                     if (!rowResult.success) {
                         return reply.code(400).send({
                             error: 'Validation Error',
