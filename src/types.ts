@@ -16,7 +16,7 @@ export const AppFieldSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     type: AppFieldTypeSchema,
-    isRequired: z.boolean(),
+    isRequired: z.boolean().default(false),
 
     // Reference Constraints
     referenceTo: z.string().optional(),
