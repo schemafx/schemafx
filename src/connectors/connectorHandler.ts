@@ -13,6 +13,11 @@ import {
 } from '../types.js';
 import z from 'zod';
 
+/**
+ * Generate a Zod object from an AppTable definition.
+ * @param table Table to generate the validator from.
+ * @returns Zod object validator from table.
+ */
 function _zodFromTable(table: AppTable) {
     return z.strictObject(
         Object.fromEntries(
@@ -53,6 +58,13 @@ function _zodFromTable(table: AppTable) {
     );
 }
 
+/**
+ * Reorders elements within an array.
+ * @param oldIndex Previous index.
+ * @param newIndex New index.
+ * @param array Array containing the data.
+ * @returns Reordered array.
+ */
 function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     let arr = [...array];
     const old = arr.splice(oldIndex, 1);
@@ -60,6 +72,7 @@ function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     return arr;
 }
 
+/** Fastify Schema for table queries. */
 const tableQuerySchema = {
     params: z.object({
         appId: z.string().min(1),

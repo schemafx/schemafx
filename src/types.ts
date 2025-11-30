@@ -76,13 +76,49 @@ export const AppSchemaSchema = z.object({
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
 
 export abstract class Connector {
+    /**
+     * Retrieve a Schema.
+     * @param appId Id of the Application.
+     * @returns Application Schema.
+     */
     getSchema?(appId: string): Promise<AppSchema>;
+
+    /**
+     * Save an updated Schema.
+     * @param appId Id of the Application.
+     * @param schema Updated Schema to save.
+     * @returns Application Schema.
+     */
     saveSchema?(appId: string, schema: AppSchema): Promise<AppSchema>;
+
+    /**
+     * Delete the Schema for an Application.
+     * @param appId Id of the Application.
+     */
     deleteSchema?(appId: string): Promise<void>;
 
+    /**
+     * Get data from a Table.
+     * @param appId Id of the Application.
+     * @param tableId Id of the Table.
+     */
     getData?(appId: string, tableId: string): Promise<AppTableRow[]>;
+
+    /**
+     * Add a new Row to the Table.
+     * @param appId Id of the Application.
+     * @param tableId Id of the Table.
+     * @param row Table Row.
+     */
     addRow?(appId: string, tableId: string, row?: AppTableRow): Promise<AppTableRow[]>;
 
+    /**
+     * Update a Row from the Table.
+     * @param appId Id of the Application.
+     * @param tableId Id of the Table.
+     * @param rowIndex Index of the Row.
+     * @param row Table Row.
+     */
     updateRow?(
         appId: string,
         tableId: string,
@@ -90,5 +126,11 @@ export abstract class Connector {
         row?: AppTableRow
     ): Promise<AppTableRow[]>;
 
+    /**
+     * Delete a Row from the Table.
+     * @param appId Id of the Application.
+     * @param tableId Id of the Table.
+     * @param rowIndex Index of the Row.
+     */
     deleteRow?(appId: string, tableId: string, rowIndex?: number): Promise<AppTableRow[]>;
 }
