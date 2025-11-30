@@ -9,8 +9,8 @@ import {
     type AppView,
     AppViewSchema
 } from '../types.js';
-import { addRow, deleteRow, getData, getSchema, saveSchema, updateRow } from '../mock_data.js';
 import z from 'zod';
+import MemoryConnector from './memoryConnector.js';
 
 function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     let arr = [...array];
@@ -20,6 +20,8 @@ function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
 }
 
 const plugin: FastifyPluginAsyncZod = async fastify => {
+    const connector = new MemoryConnector();
+
     fastify.get(
         '/apps/:appId/schema',
         {
@@ -28,7 +30,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                 response: { 200: AppSchemaSchema }
             }
         },
-        request => getSchema(request.params.appId)
+        request => connector.getSchema(request.params.appId)
     );
 
     fastify.post(
@@ -87,7 +89,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
         },
         async request => {
             const { appId } = request.params;
-            const schema = await getSchema(appId);
+            const schema = await connector.getSchema(appId);
 
             switch (request.body.action) {
                 case 'add':
@@ -122,7 +124,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return saveSchema(appId, schema);
+                    return connector.saveSchema(appId, schema);
                 case 'update':
                     const updateEl = request.body.element;
 
@@ -150,7 +152,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return saveSchema(appId, schema);
+                    return connector.saveSchema(appId, schema);
                 case 'delete':
                     const delEl = request.body.element;
 
@@ -180,7 +182,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return saveSchema(appId, schema);
+                    return connector.saveSchema(appId, schema);
                 case 'reorder':
                     const reoEl = request.body.element;
                     const { oldIndex, newIndex } = request.body;
@@ -199,10 +201,10 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return saveSchema(appId, schema);
+                    return connector.saveSchema(appId, schema);
             }
 
-            return getSchema(request.params.appId);
+            return connector.getSchema(request.params.appId);
         }
     );
 
@@ -219,7 +221,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                 }
             }
         },
-        request => getData(request.params.appId, request.params.tableId)
+        request => connector.getData(request.params.appId, request.params.tableId)
     );
 
     fastify.post(
@@ -254,19 +256,23 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
             const { tableId } = request.params;
             switch (request.body.action) {
                 case 'add':
-                    return addRow(request.params.appId, tableId, request.body.row);
+                    return connector.addRow(request.params.appId, tableId, request.body.row);
                 case 'update':
-                    return updateRow(
+                    return connector.updateRow(
                         request.params.appId,
                         tableId,
                         request.body.rowIndex,
                         request.body.row
                     );
                 case 'delete':
-                    return deleteRow(request.params.appId, tableId, request.body.rowIndex);
+                    return connector.deleteRow(
+                        request.params.appId,
+                        tableId,
+                        request.body.rowIndex
+                    );
             }
 
-            return getData(request.params.appId, tableId);
+            return connector.getData(request.params.appId, tableId);
         }
     );
 };

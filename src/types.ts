@@ -73,3 +73,21 @@ export const AppSchemaSchema = z.object({
 });
 
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
+
+export abstract class Connector {
+    getSchema?(appId: string): PromiseLike<AppSchema>;
+    saveSchema?(appId: string, schema: AppSchema): PromiseLike<AppSchema>;
+    deleteSchema?(appId: string): PromiseLike<void>;
+
+    getData?(appId: string, tableId: string): PromiseLike<AppTableRow[]>;
+    addRow?(appId: string, tableId: string, row?: AppTableRow): PromiseLike<AppTableRow[]>;
+
+    updateRow?(
+        appId: string,
+        tableId: string,
+        rowIndex?: number,
+        row?: AppTableRow
+    ): PromiseLike<AppTableRow[]>;
+
+    deleteRow?(appId: string, tableId: string, rowIndex?: number): PromiseLike<AppTableRow[]>;
+}
