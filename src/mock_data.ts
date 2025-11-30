@@ -2,7 +2,7 @@ import mock_data from './mock_data.json' with { type: 'json' };
 import type { AppSchema, AppTableRow } from './types.js';
 
 const schemas: Map<string, AppSchema> = new Map();
-const tables: Map<string, AppTableRow[]> = new Map();
+const tables: Map<string, Map<string, AppTableRow[]>> = new Map();
 
 export async function getSchema(appId: string) {
     let schema = schemas.get(appId);
@@ -25,7 +25,8 @@ export async function deleteSchema(appId: string) {
 }
 
 export async function getData(appId: string, tableId: string) {
-    return [...(tables.get(tableId) ?? [])];
+    if (!tables.has(appId)) tables.set(appId, new Map());
+    return [...(tables.get(appId)?.get(tableId) ?? [])];
 }
 
 export async function addRow(appId: string, tableId: string, row?: AppTableRow) {
@@ -33,7 +34,9 @@ export async function addRow(appId: string, tableId: string, row?: AppTableRow) 
     if (!row) return data;
 
     data.push(row);
-    tables.set(tableId, data);
+
+    if (!tables.has(appId)) tables.set(appId, new Map());
+    tables.get(appId)?.set(tableId, data);
 
     return data;
 }
@@ -49,7 +52,9 @@ export async function updateRow(
     if (typeof rowIndex !== 'number' || !data[rowIndex] || !row) return data;
 
     data[rowIndex] = { ...row };
-    tables.set(tableId, data);
+
+    if (!tables.has(appId)) tables.set(appId, new Map());
+    tables.get(appId)?.set(tableId, data);
 
     return data;
 }
@@ -60,7 +65,9 @@ export async function deleteRow(appId: string, tableId: string, rowIndex?: numbe
     if (typeof rowIndex !== 'number' || !data[rowIndex]) return data;
 
     data.splice(rowIndex, 1);
-    tables.set(tableId, data);
+
+    if (!tables.has(appId)) tables.set(appId, new Map());
+    tables.get(appId)?.set(tableId, data);
 
     return data;
 }
