@@ -6,13 +6,14 @@ let mockSchema = { ...mock_data } as AppSchema;
 type ElementParentType = 'tables' | 'fields' | 'views';
 
 export async function addElement(
+    appId: string,
     element: AppTable | AppView | AppField,
     partOf: ElementParentType,
     options?: {
         parentId?: string;
     }
 ) {
-    const schema = await getSchema();
+    const schema = await getSchema(appId);
 
     if (partOf === 'tables') {
         schema.tables.push(element as AppTable);
@@ -36,17 +37,18 @@ export async function addElement(
         });
     }
 
-    return saveSchema(schema);
+    return saveSchema(appId, schema);
 }
 
 export async function updateElement(
+    appId: string,
     element: AppTable | AppView | AppField,
     partOf: ElementParentType,
     options?: {
         parentId?: string;
     }
 ) {
-    const schema = await getSchema();
+    const schema = await getSchema(appId);
 
     if (partOf === 'tables') {
         schema.tables = schema.tables.map(table =>
@@ -68,17 +70,18 @@ export async function updateElement(
         });
     }
 
-    return saveSchema(schema);
+    return saveSchema(appId, schema);
 }
 
 export async function deleteElement(
+    appId: string,
     elementId: string,
     partOf: ElementParentType,
     options?: {
         parentId?: string;
     }
 ) {
-    const schema = await getSchema();
+    const schema = await getSchema(appId);
 
     if (partOf === 'tables') {
         schema.tables = schema.tables.filter(table => table.id !== elementId);
@@ -102,7 +105,7 @@ export async function deleteElement(
         });
     }
 
-    return saveSchema(schema);
+    return saveSchema(appId, schema);
 }
 
 function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
@@ -113,6 +116,7 @@ function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
 }
 
 export async function reorderElement(
+    appId: string,
     oldIndex: number,
     newIndex: number,
     partOf: ElementParentType,
@@ -120,7 +124,7 @@ export async function reorderElement(
         parentId?: string;
     }
 ) {
-    const schema = await getSchema();
+    const schema = await getSchema(appId);
 
     if (partOf === 'tables') {
         schema.tables = _reorderElement(oldIndex, newIndex, schema.tables);
@@ -136,26 +140,27 @@ export async function reorderElement(
         });
     }
 
-    return saveSchema(schema);
+    return saveSchema(appId, schema);
 }
 
-export async function getSchema() {
+export async function getSchema(appId: string) {
+    console.debug(appId);
     return { ...mockSchema };
 }
 
-export async function saveSchema(schema: AppSchema) {
+export async function saveSchema(appId: string, schema: AppSchema) {
     mockSchema = schema;
     return mockSchema;
 }
 
 const tables: Map<string, AppTableRow[]> = new Map();
 
-export async function getData(tableId: string) {
+export async function getData(appId: string, tableId: string) {
     return [...(tables.get(tableId) ?? [])];
 }
 
-export async function addRow(tableId: string, row?: AppTableRow) {
-    const data = await getData(tableId);
+export async function addRow(appId: string, tableId: string, row?: AppTableRow) {
+    const data = await getData(appId, tableId);
     if (!row) return data;
 
     data.push(row);
@@ -164,8 +169,13 @@ export async function addRow(tableId: string, row?: AppTableRow) {
     return data;
 }
 
-export async function updateRow(tableId: string, rowIndex?: number, row?: AppTableRow) {
-    const data = await getData(tableId);
+export async function updateRow(
+    appId: string,
+    tableId: string,
+    rowIndex?: number,
+    row?: AppTableRow
+) {
+    const data = await getData(appId, tableId);
 
     if (typeof rowIndex !== 'number' || !data[rowIndex] || !row) return data;
 
@@ -175,8 +185,8 @@ export async function updateRow(tableId: string, rowIndex?: number, row?: AppTab
     return data;
 }
 
-export async function deleteRow(tableId: string, rowIndex?: number) {
-    const data = await getData(tableId);
+export async function deleteRow(appId: string, tableId: string, rowIndex?: number) {
+    const data = await getData(appId, tableId);
 
     if (typeof rowIndex !== 'number' || !data[rowIndex]) return data;
 

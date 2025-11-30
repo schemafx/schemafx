@@ -49,7 +49,7 @@ app.get(
             response: { 200: AppSchemaSchema }
         }
     },
-    () => getSchema()
+    request => getSchema(request.params.appId)
 );
 
 app.post(
@@ -110,6 +110,7 @@ app.post(
         switch (request.body.action) {
             case 'add':
                 return addElement(
+                    request.params.appId,
                     request.body.element.element,
                     request.body.element.partOf,
                     'parentId' in request.body.element
@@ -120,6 +121,7 @@ app.post(
                 );
             case 'update':
                 return updateElement(
+                    request.params.appId,
                     request.body.element.element,
                     request.body.element.partOf,
                     'parentId' in request.body.element
@@ -130,6 +132,7 @@ app.post(
                 );
             case 'delete':
                 return deleteElement(
+                    request.params.appId,
                     request.body.element.elementId,
                     request.body.element.partOf,
                     'parentId' in request.body.element
@@ -140,6 +143,7 @@ app.post(
                 );
             case 'reorder':
                 return reorderElement(
+                    request.params.appId,
                     request.body.oldIndex,
                     request.body.newIndex,
                     request.body.element.partOf,
@@ -151,7 +155,7 @@ app.post(
                 );
         }
 
-        return getSchema();
+        return getSchema(request.params.appId);
     }
 );
 
@@ -168,7 +172,7 @@ app.get(
             }
         }
     },
-    request => getData(request.params.tableId)
+    request => getData(request.params.appId, request.params.tableId)
 );
 
 app.post(
@@ -203,14 +207,19 @@ app.post(
         const { tableId } = request.params;
         switch (request.body.action) {
             case 'add':
-                return addRow(tableId, request.body.row);
+                return addRow(request.params.appId, tableId, request.body.row);
             case 'update':
-                return updateRow(tableId, request.body.rowIndex, request.body.row);
+                return updateRow(
+                    request.params.appId,
+                    tableId,
+                    request.body.rowIndex,
+                    request.body.row
+                );
             case 'delete':
-                return deleteRow(tableId, request.body.rowIndex);
+                return deleteRow(request.params.appId, tableId, request.body.rowIndex);
         }
 
-        return getData(tableId);
+        return getData(request.params.appId, tableId);
     }
 );
 
