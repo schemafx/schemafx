@@ -1,17 +1,21 @@
-import {
-    type TableDefinition,
-    type TableColumnDefinition,
-    AuthPayloadKeys,
-    TableColumnType
-} from './schemas';
-export { TableDefinition, TableColumnDefinition, AuthPayloadKeys, TableColumnType };
-
-import { zodToTableColumns } from './utils/zodToTableColumns';
-export const utils = { zodToTableColumns };
-
-import { Connector, ConnectorAuthType, ConnectorAuthPropType } from './connector';
-export { Connector, ConnectorAuthType, ConnectorAuthPropType };
-
-import { SchemaFX, type SchemaFXOptions } from './core';
-export { SchemaFXOptions };
+// Default
+import SchemaFX from './core.js';
 export default SchemaFX;
+
+// Options
+export type { SchemaFXOptions } from './core.js';
+
+// Types
+export {
+    type AppFieldType,
+    type AppField,
+    type AppTable,
+    type AppTableRow,
+    type AppViewType,
+    type AppView,
+    type AppSchema,
+    Connector
+} from './types.js';
+
+// Connectors
+export { default as MemoryConnector } from './connectors/memoryConnector.js';

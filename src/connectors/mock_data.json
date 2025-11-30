@@ -1,0 +1,86 @@
+{
+    "id": "demo_crm",
+    "name": "Demo CRM",
+    "tables": [
+        {
+            "id": "customers",
+            "name": "Customers",
+            "connector": "memory",
+            "fields": [
+                {
+                    "id": "_id",
+                    "name": "ID",
+                    "type": "text"
+                },
+                {
+                    "id": "name",
+                    "name": "Name",
+                    "type": "text"
+                },
+                {
+                    "id": "email",
+                    "name": "Email",
+                    "type": "email"
+                }
+            ]
+        },
+        {
+            "id": "orders",
+            "name": "Orders",
+            "connector": "memory",
+            "fields": [
+                {
+                    "id": "_id",
+                    "name": "ID",
+                    "type": "text"
+                },
+                {
+                    "id": "product",
+                    "name": "Product",
+                    "type": "text"
+                },
+                {
+                    "id": "price",
+                    "name": "Price",
+                    "type": "number"
+                },
+                {
+                    "id": "customer",
+                    "name": "Customer",
+                    "type": "reference",
+                    "referenceTo": "customers"
+                }
+            ]
+        }
+    ],
+    "views": [
+        {
+            "id": "customers_table",
+            "name": "Customers Table",
+            "tableId": "customers",
+            "type": "table",
+            "fields": ["name", "email"]
+        },
+        {
+            "id": "customers_form",
+            "name": "New Customer Form",
+            "tableId": "customers",
+            "type": "form",
+            "fields": ["name", "email"]
+        },
+        {
+            "id": "orders_table",
+            "name": "Orders Table",
+            "tableId": "orders",
+            "type": "table",
+            "fields": ["product", "price", "customer"]
+        },
+        {
+            "id": "orders_form",
+            "name": "New Order Form",
+            "tableId": "orders",
+            "type": "form",
+            "fields": ["product", "price", "customer"]
+        }
+    ]
+}
