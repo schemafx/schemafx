@@ -8,6 +8,11 @@
             "connector": "memory",
             "fields": [
                 {
+                    "id": "_id",
+                    "name": "ID",
+                    "type": "text"
+                },
+                {
                     "id": "name",
                     "name": "Name",
                     "type": "text"
@@ -24,6 +29,11 @@
             "name": "Orders",
             "connector": "memory",
             "fields": [
+                {
+                    "id": "_id",
+                    "name": "ID",
+                    "type": "text"
+                },
                 {
                     "id": "product",
                     "name": "Product",
