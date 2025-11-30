@@ -12,6 +12,46 @@ import {
 } from '../types.js';
 import z from 'zod';
 
+function _zodFromTable(table: AppTable) {
+    return z.strictObject(
+        Object.fromEntries(
+            table.fields.map(field => {
+                let fld;
+
+                switch (field.type) {
+                    case 'number':
+                        fld = z.number();
+                        if (typeof field.minValue === 'number') fld = fld.min(field.minValue);
+                        if (typeof field.maxValue === 'number') fld = fld.max(field.maxValue);
+                        break;
+                    case 'boolean':
+                        fld = z.boolean();
+                        break;
+                    case 'date':
+                        fld = z.date();
+                        if (field.startDate) fld = fld.min(field.startDate);
+                        if (field.endDate) fld = fld.max(field.endDate);
+                        break;
+                    case 'email':
+                        fld = z.email();
+                        break;
+                    case 'dropdown':
+                        fld = z.enum(field.options ?? []);
+                        break;
+                    default:
+                        fld = z.string();
+                        if (typeof field.minLength === 'number') fld = fld.min(field.minLength);
+                        if (typeof field.maxLength === 'number') fld = fld.max(field.maxLength);
+                        break;
+                }
+
+                if (!field.isRequired) fld = fld?.optional();
+                return [field.id, fld];
+            })
+        )
+    );
+}
+
 function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     let arr = [...array];
     const old = arr.splice(oldIndex, 1);
@@ -279,27 +319,72 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     })
                 ]),
                 response: {
-                    200: z.array(AppTableRowSchema)
+                    200: z.array(AppTableRowSchema),
+                    400: z.object({
+                        error: z.string(),
+                        message: z.string(),
+                        details: z.array(
+                            z.object({
+                                field: z.string(),
+                                message: z.string(),
+                                code: z.string()
+                            })
+                        )
+                    })
                 }
             }
         },
-        async request => {
+        async (request, reply) => {
             const { appId, tableId } = request.params;
 
             const schema = await sConnector.getSchema!(appId);
-            const connectorName = schema.tables.find(table => table.id === tableId)?.connector;
+            const table = schema.tables.find(table => table.id === tableId);
 
-            if (!connectorName) return;
+            if (!table) return;
 
+            const connectorName = table.connector;
             const conn = connectors[connectorName];
 
             if (!conn) return;
 
+            let row, rowResult;
             switch (request.body.action) {
                 case 'add':
-                    return conn.addRow!(appId, tableId, request.body.row);
+                    row = request.body.row;
+                    rowResult = _zodFromTable(table).safeParse(row);
+
+                    console.log(row, rowResult);
+                    if (!rowResult.success) {
+                        return reply.code(400).send({
+                            error: 'Validation Error',
+                            message: 'Invalid input data',
+                            details: rowResult.error.issues.map(err => ({
+                                field: err.path.join('.'),
+                                message: err.message,
+                                code: err.code
+                            }))
+                        });
+                    }
+
+                    return conn.addRow!(appId, tableId, row);
                 case 'update':
-                    return conn.updateRow!(appId, tableId, request.body.rowIndex, request.body.row);
+                    row = request.body.row;
+                    rowResult = _zodFromTable(table).safeParse(row);
+
+                    console.log(row, rowResult);
+                    if (!rowResult.success) {
+                        return reply.code(400).send({
+                            error: 'Validation Error',
+                            message: 'Invalid input data',
+                            details: rowResult.error.issues.map(err => ({
+                                field: err.path.join('.'),
+                                message: err.message,
+                                code: err.code
+                            }))
+                        });
+                    }
+
+                    return conn.updateRow!(appId, tableId, request.body.rowIndex, row);
                 case 'delete':
                     return conn.deleteRow!(appId, tableId, request.body.rowIndex);
             }
