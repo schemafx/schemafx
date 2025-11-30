@@ -8,7 +8,7 @@ import {
     AppTableSchema,
     type AppView,
     AppViewSchema,
-    Connector
+    type Connector
 } from '../types.js';
 import z from 'zod';
 
