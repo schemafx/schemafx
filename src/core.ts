@@ -16,6 +16,7 @@ import fastifyCors, { type FastifyCorsOptions } from '@fastify/cors';
 import fastifyRateLimit, { type FastifyRateLimitOptions } from '@fastify/rate-limit';
 import fastifyHealthcheck, { type FastifyHealthcheckOptions } from 'fastify-healthcheck';
 import fastifyHelmet, { type FastifyHelmetOptions } from '@fastify/helmet';
+import fastifyJwt, { type FastifyJWTOptions } from '@fastify/jwt';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import connectorHandler, { type SchemaFXConnectorsOptions } from './connectors/connectorHandler.js';
@@ -26,6 +27,7 @@ export type SchemaFXOptions = {
     corsOpts?: FastifyCorsOptions;
     rateLimitOpts?: FastifyRateLimitOptions;
     healthcheckOpts?: FastifyHealthcheckOptions;
+    jwtOpts: FastifyJWTOptions;
     connectorOpts: SchemaFXConnectorsOptions;
 };
 
@@ -64,6 +66,11 @@ export default class SchemaFX {
                 message: `Rate limit exceeded. Retry in ${Math.round(context.ttl / 1000)}s`
             }),
             ...(opts.rateLimitOpts ?? {})
+        });
+
+        this.fastifyInstance.register(fastifyJwt, opts.jwtOpts);
+        this.fastifyInstance.decorate('authenticate', async request => {
+            await request.jwtVerify().catch(() => undefined);
         });
 
         this.fastifyInstance.register(fastifyHealthcheck, opts.healthcheckOpts ?? {});

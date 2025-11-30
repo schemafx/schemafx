@@ -121,9 +121,46 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         throw new Error(`Missing implementation "deleteSchema" on connector "${schemaConnector}".`);
     }
 
+    fastify.post(
+        '/login',
+        {
+            schema: {
+                body: z.object({
+                    username: z.string().min(1),
+                    password: z.string().min(1)
+                }),
+                response: {
+                    200: z.object({
+                        token: z.string()
+                    }),
+                    401: z.object({
+                        error: z.string(),
+                        message: z.string()
+                    })
+                }
+            }
+        },
+        async (request, reply) => {
+            const { username, password } = request.body;
+            const isValid = username === 'test' && password === 'test';
+
+            if (isValid) {
+                return {
+                    token: fastify.jwt.sign({ id: username }, { expiresIn: '8h' })
+                };
+            }
+
+            return reply.code(401).send({
+                error: 'Unauthorized',
+                message: 'Invalid credentials.'
+            });
+        }
+    );
+
     fastify.get(
         '/apps/:appId/schema',
         {
+            onRequest: [fastify.authenticate],
             schema: {
                 params: z.object({ appId: z.string().min(1) }),
                 response: { 200: AppSchemaSchema }
@@ -135,6 +172,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify.post(
         '/apps/:appId/schema',
         {
+            onRequest: [fastify.authenticate],
             schema: {
                 params: z.object({ appId: z.string().min(1) }),
                 body: z.discriminatedUnion('action', [
@@ -338,7 +376,10 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
     fastify.get(
         '/apps/:appId/data/:tableId',
-        { schema: tableQuerySchema },
+        {
+            onRequest: [fastify.authenticate],
+            schema: tableQuerySchema
+        },
         async (request, reply) => {
             const { appId, tableId } = request.params;
 
@@ -352,6 +393,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify.post(
         '/apps/:appId/data/:tableId',
         {
+            onRequest: [fastify.authenticate],
             schema: {
                 body: z.discriminatedUnion('action', [
                     z.object({

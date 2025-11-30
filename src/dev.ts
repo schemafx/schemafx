@@ -1,9 +1,14 @@
 import SchemaFX, { MemoryConnector } from './index.js';
 
 const app = new SchemaFX({
+    jwtOpts: {
+        secret: 'my-very-secret'
+    },
     connectorOpts: {
         schemaConnector: 'memory',
-        connectors: { memory: new MemoryConnector() }
+        connectors: {
+            memory: new MemoryConnector()
+        }
     }
 });
 
