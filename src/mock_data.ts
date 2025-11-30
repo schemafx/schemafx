@@ -1,7 +1,8 @@
 import mock_data from './mock_data.json' with { type: 'json' };
 import type { AppField, AppSchema, AppTable, AppTableRow, AppView } from './types.js';
 
-let mockSchema = { ...mock_data } as AppSchema;
+const schemas: Map<string, AppSchema> = new Map();
+const tables: Map<string, AppTableRow[]> = new Map();
 
 type ElementParentType = 'tables' | 'fields' | 'views';
 
@@ -144,16 +145,24 @@ export async function reorderElement(
 }
 
 export async function getSchema(appId: string) {
-    console.debug(appId);
-    return { ...mockSchema };
+    let schema = schemas.get(appId);
+
+    if (!schema) {
+        schema = { ...mock_data } as AppSchema;
+        await saveSchema(appId, schema);
+    }
+
+    return schema;
 }
 
 export async function saveSchema(appId: string, schema: AppSchema) {
-    mockSchema = schema;
-    return mockSchema;
+    schemas.set(appId, schema);
+    return schema;
 }
 
-const tables: Map<string, AppTableRow[]> = new Map();
+export async function deleteSchema(appId: string) {
+    schemas.delete(appId);
+}
 
 export async function getData(appId: string, tableId: string) {
     return [...(tables.get(tableId) ?? [])];
