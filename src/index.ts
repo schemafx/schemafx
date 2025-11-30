@@ -9,6 +9,7 @@ import 'dotenv/config';
 
 import fastifyCors from '@fastify/cors';
 import connectorHandler from './connectors/connectorHandler.js';
+import MemoryConnector from './connectors/memoryConnector.js';
 
 const app = fastify({
     logger: true
@@ -24,7 +25,11 @@ app.register(fastifyCors, {
     allowedHeaders: ['Content-Type']
 });
 
-app.register(connectorHandler, { prefix: '/api' });
+app.register(connectorHandler, {
+    prefix: '/api',
+    schemaConnector: 'memory',
+    connectors: { memory: new MemoryConnector() }
+});
 
 // Start
 try {

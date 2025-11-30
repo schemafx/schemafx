@@ -42,6 +42,7 @@ export type AppField = z.infer<typeof AppFieldSchema>;
 export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
+    connector: z.string().min(1),
     fields: z.array(AppFieldSchema)
 });
 
@@ -75,19 +76,19 @@ export const AppSchemaSchema = z.object({
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
 
 export abstract class Connector {
-    getSchema?(appId: string): PromiseLike<AppSchema>;
-    saveSchema?(appId: string, schema: AppSchema): PromiseLike<AppSchema>;
-    deleteSchema?(appId: string): PromiseLike<void>;
+    getSchema?(appId: string): Promise<AppSchema>;
+    saveSchema?(appId: string, schema: AppSchema): Promise<AppSchema>;
+    deleteSchema?(appId: string): Promise<void>;
 
-    getData?(appId: string, tableId: string): PromiseLike<AppTableRow[]>;
-    addRow?(appId: string, tableId: string, row?: AppTableRow): PromiseLike<AppTableRow[]>;
+    getData?(appId: string, tableId: string): Promise<AppTableRow[]>;
+    addRow?(appId: string, tableId: string, row?: AppTableRow): Promise<AppTableRow[]>;
 
     updateRow?(
         appId: string,
         tableId: string,
         rowIndex?: number,
         row?: AppTableRow
-    ): PromiseLike<AppTableRow[]>;
+    ): Promise<AppTableRow[]>;
 
-    deleteRow?(appId: string, tableId: string, rowIndex?: number): PromiseLike<AppTableRow[]>;
+    deleteRow?(appId: string, tableId: string, rowIndex?: number): Promise<AppTableRow[]>;
 }

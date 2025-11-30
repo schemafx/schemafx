@@ -7,10 +7,10 @@ import {
     AppTableRowSchema,
     AppTableSchema,
     type AppView,
-    AppViewSchema
+    AppViewSchema,
+    Connector
 } from '../types.js';
 import z from 'zod';
-import MemoryConnector from './memoryConnector.js';
 
 function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     let arr = [...array];
@@ -19,8 +19,21 @@ function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
     return arr;
 }
 
-const plugin: FastifyPluginAsyncZod = async fastify => {
-    const connector = new MemoryConnector();
+const plugin: FastifyPluginAsyncZod<{
+    schemaConnector: string;
+    connectors: Record<string, Connector>;
+}> = async (fastify, { schemaConnector, connectors }) => {
+    const sConnector = connectors[schemaConnector];
+
+    if (!sConnector) {
+        throw new Error(`Unrecognized connector "${schemaConnector}".`);
+    } else if (!sConnector.getSchema) {
+        throw new Error(`Missing implementation "getSchema" on connector "${schemaConnector}".`);
+    } else if (!sConnector.saveSchema) {
+        throw new Error(`Missing implementation "saveSchema" on connector "${schemaConnector}".`);
+    } else if (!sConnector.deleteSchema) {
+        throw new Error(`Missing implementation "deleteSchema" on connector "${schemaConnector}".`);
+    }
 
     fastify.get(
         '/apps/:appId/schema',
@@ -30,7 +43,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                 response: { 200: AppSchemaSchema }
             }
         },
-        request => connector.getSchema(request.params.appId)
+        request => sConnector.getSchema!(request.params.appId)
     );
 
     fastify.post(
@@ -89,7 +102,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
         },
         async request => {
             const { appId } = request.params;
-            const schema = await connector.getSchema(appId);
+            const schema = await sConnector.getSchema!(appId);
 
             switch (request.body.action) {
                 case 'add':
@@ -124,7 +137,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return connector.saveSchema(appId, schema);
+                    return sConnector.saveSchema!(appId, schema);
                 case 'update':
                     const updateEl = request.body.element;
 
@@ -152,7 +165,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return connector.saveSchema(appId, schema);
+                    return sConnector.saveSchema!(appId, schema);
                 case 'delete':
                     const delEl = request.body.element;
 
@@ -182,7 +195,7 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return connector.saveSchema(appId, schema);
+                    return sConnector.saveSchema!(appId, schema);
                 case 'reorder':
                     const reoEl = request.body.element;
                     const { oldIndex, newIndex } = request.body;
@@ -201,10 +214,10 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                         });
                     }
 
-                    return connector.saveSchema(appId, schema);
+                    return sConnector.saveSchema!(appId, schema);
             }
 
-            return connector.getSchema(request.params.appId);
+            return sConnector.getSchema!(request.params.appId);
         }
     );
 
@@ -221,7 +234,20 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                 }
             }
         },
-        request => connector.getData(request.params.appId, request.params.tableId)
+        async request => {
+            const { appId, tableId } = request.params;
+
+            const schema = await sConnector.getSchema!(appId);
+            const connectorName = schema.tables.find(table => table.id === tableId)?.connector;
+
+            if (!connectorName) return;
+
+            const conn = connectors[connectorName];
+
+            if (!conn) return;
+
+            return conn.getData!(appId, tableId);
+        }
     );
 
     fastify.post(
@@ -252,27 +278,28 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
                 }
             }
         },
-        request => {
-            const { tableId } = request.params;
+        async request => {
+            const { appId, tableId } = request.params;
+
+            const schema = await sConnector.getSchema!(appId);
+            const connectorName = schema.tables.find(table => table.id === tableId)?.connector;
+
+            if (!connectorName) return;
+
+            const conn = connectors[connectorName];
+
+            if (!conn) return;
+
             switch (request.body.action) {
                 case 'add':
-                    return connector.addRow(request.params.appId, tableId, request.body.row);
+                    return conn.addRow!(appId, tableId, request.body.row);
                 case 'update':
-                    return connector.updateRow(
-                        request.params.appId,
-                        tableId,
-                        request.body.rowIndex,
-                        request.body.row
-                    );
+                    return conn.updateRow!(appId, tableId, request.body.rowIndex, request.body.row);
                 case 'delete':
-                    return connector.deleteRow(
-                        request.params.appId,
-                        tableId,
-                        request.body.rowIndex
-                    );
+                    return conn.deleteRow!(appId, tableId, request.body.rowIndex);
             }
 
-            return connector.getData(request.params.appId, tableId);
+            return conn.getData!(appId, tableId);
         }
     );
 };
