@@ -1,25 +1,25 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import {
+    type AppField,
     AppFieldSchema,
     AppSchemaSchema,
+    type AppTable,
     AppTableRowSchema,
     AppTableSchema,
+    type AppView,
     AppViewSchema
 } from '../types.js';
-import {
-    addElement,
-    addRow,
-    deleteElement,
-    deleteRow,
-    getData,
-    getSchema,
-    reorderElement,
-    updateElement,
-    updateRow
-} from '../mock_data.js';
+import { addRow, deleteRow, getData, getSchema, saveSchema, updateRow } from '../mock_data.js';
 import z from 'zod';
 
-const plugins: FastifyPluginAsyncZod = async fastify => {
+function _reorderElement<D>(oldIndex: number, newIndex: number, array: D[]) {
+    let arr = [...array];
+    const old = arr.splice(oldIndex, 1);
+    arr.splice(newIndex, 0, ...old);
+    return arr;
+}
+
+const plugin: FastifyPluginAsyncZod = async fastify => {
     fastify.get(
         '/apps/:appId/schema',
         {
@@ -85,53 +85,121 @@ const plugins: FastifyPluginAsyncZod = async fastify => {
                 response: { 200: AppSchemaSchema }
             }
         },
-        request => {
+        async request => {
+            const { appId } = request.params;
+            const schema = await getSchema(appId);
+
             switch (request.body.action) {
                 case 'add':
-                    return addElement(
-                        request.params.appId,
-                        request.body.element.element,
-                        request.body.element.partOf,
-                        'parentId' in request.body.element
-                            ? {
-                                  parentId: request.body.element.parentId
-                              }
-                            : {}
-                    );
+                    const addEl = request.body.element;
+
+                    if (addEl.partOf === 'tables') {
+                        schema.tables.push(addEl.element as AppTable);
+                    } else if (addEl.partOf === 'views') {
+                        schema.views.push(addEl.element as AppView);
+                    } else if (addEl.partOf === 'fields' && addEl.parentId) {
+                        const oldFieldsLength =
+                            schema.tables.find(table => table.id === addEl.parentId)?.fields
+                                ?.length ?? 0;
+
+                        schema.views = schema.views.map(view => {
+                            if (
+                                view.tableId === addEl.parentId &&
+                                view.fields.length === oldFieldsLength
+                            ) {
+                                view.fields.push((addEl.element as AppField).id);
+                            }
+
+                            return view;
+                        });
+
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === addEl.parentId) {
+                                table.fields.push(addEl.element as AppField);
+                            }
+
+                            return table;
+                        });
+                    }
+
+                    return saveSchema(appId, schema);
                 case 'update':
-                    return updateElement(
-                        request.params.appId,
-                        request.body.element.element,
-                        request.body.element.partOf,
-                        'parentId' in request.body.element
-                            ? {
-                                  parentId: request.body.element.parentId
-                              }
-                            : {}
-                    );
+                    const updateEl = request.body.element;
+
+                    if (updateEl.partOf === 'tables') {
+                        schema.tables = schema.tables.map(table =>
+                            table.id === updateEl.element.id
+                                ? (updateEl.element as AppTable)
+                                : table
+                        );
+                    } else if (updateEl.partOf === 'views') {
+                        schema.views = schema.views.map(view =>
+                            view.id === updateEl.element.id ? (updateEl.element as AppView) : view
+                        );
+                    } else if (updateEl.partOf === 'fields' && updateEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === updateEl.parentId) {
+                                table.fields = table.fields.map(field =>
+                                    field.id === updateEl.element.id
+                                        ? (updateEl.element as AppField)
+                                        : field
+                                );
+                            }
+
+                            return table;
+                        });
+                    }
+
+                    return saveSchema(appId, schema);
                 case 'delete':
-                    return deleteElement(
-                        request.params.appId,
-                        request.body.element.elementId,
-                        request.body.element.partOf,
-                        'parentId' in request.body.element
-                            ? {
-                                  parentId: request.body.element.parentId
-                              }
-                            : {}
-                    );
+                    const delEl = request.body.element;
+
+                    if (delEl.partOf === 'tables') {
+                        schema.tables = schema.tables.filter(table => table.id !== delEl.elementId);
+                    } else if (delEl.partOf === 'views') {
+                        schema.views = schema.views.filter(view => view.id !== delEl.elementId);
+                    } else if (delEl.partOf === 'fields' && delEl.parentId) {
+                        schema.views = schema.views.map(view => {
+                            if (view.tableId === delEl.parentId) {
+                                view.fields = view.fields.filter(
+                                    field => field !== delEl.elementId
+                                );
+                            }
+
+                            return view;
+                        });
+
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === delEl.parentId) {
+                                table.fields = table.fields.filter(
+                                    field => field.id !== delEl.elementId
+                                );
+                            }
+
+                            return table;
+                        });
+                    }
+
+                    return saveSchema(appId, schema);
                 case 'reorder':
-                    return reorderElement(
-                        request.params.appId,
-                        request.body.oldIndex,
-                        request.body.newIndex,
-                        request.body.element.partOf,
-                        'parentId' in request.body.element
-                            ? {
-                                  parentId: request.body.element.parentId
-                              }
-                            : {}
-                    );
+                    const reoEl = request.body.element;
+                    const { oldIndex, newIndex } = request.body;
+
+                    if (reoEl.partOf === 'tables') {
+                        schema.tables = _reorderElement(oldIndex, newIndex, schema.tables);
+                    } else if (reoEl.partOf === 'views') {
+                        schema.views = _reorderElement(oldIndex, newIndex, schema.views);
+                    } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === reoEl.parentId) {
+                                table.fields = _reorderElement(oldIndex, newIndex, table.fields);
+                            }
+
+                            return table;
+                        });
+                    }
+
+                    return saveSchema(appId, schema);
             }
 
             return getSchema(request.params.appId);
@@ -203,4 +271,4 @@ const plugins: FastifyPluginAsyncZod = async fastify => {
     );
 };
 
-export default plugins;
+export default plugin;
