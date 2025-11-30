@@ -387,7 +387,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
-                    return connector.addRow!(appId, tableId, row);
+                    return connector.addRow!(appId, tableId, rowResult.data);
                 case 'update':
                     row = request.body.row;
                     rowResult = _zodFromTable(table).safeParse(row);
@@ -404,7 +404,12 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
-                    return connector.updateRow!(appId, tableId, request.body.rowIndex, row);
+                    return connector.updateRow!(
+                        appId,
+                        tableId,
+                        request.body.rowIndex,
+                        rowResult.data
+                    );
                 case 'delete':
                     return connector.deleteRow!(appId, tableId, request.body.rowIndex);
             }
