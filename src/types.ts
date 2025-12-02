@@ -95,7 +95,8 @@ export const AppSchemaSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     tables: z.array(AppTableSchema),
-    views: z.array(AppViewSchema)
+    views: z.array(AppViewSchema),
+    showEmpty: z.boolean().default(false)
 });
 
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
