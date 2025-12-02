@@ -1,13 +1,17 @@
-import SchemaFX, { MemoryConnector } from './index.js';
+import SchemaFX, { MemoryConnector, FileConnector } from './index.js';
+import path from 'path';
+
+const dbPath = path.join(process.cwd(), 'database.json');
 
 const app = new SchemaFX({
     jwtOpts: {
         secret: 'my-very-secret'
     },
     connectorOpts: {
-        schemaConnector: 'memory',
+        schemaConnector: 'file',
         connectors: {
-            memory: new MemoryConnector()
+            memory: new MemoryConnector(),
+            file: new FileConnector(dbPath)
         }
     }
 });

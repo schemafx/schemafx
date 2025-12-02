@@ -169,3 +169,6 @@ pubspec.lock
 .svn/
 .swiftpm/
 migrate_working_dir/
+
+# Local db
+database.json
