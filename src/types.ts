@@ -7,37 +7,62 @@ export const AppFieldTypeSchema = z.enum([
     'email',
     'dropdown',
     'boolean',
-    'reference'
+    'reference',
+    'json',
+    'list'
 ]);
 
 export type AppFieldType = z.infer<typeof AppFieldTypeSchema>;
 
-export const AppFieldSchema = z.object({
-    id: z.string(),
-    name: z.string().min(1),
-    type: AppFieldTypeSchema,
-    isRequired: z.boolean().default(false),
+export type AppField = {
+    id: string;
+    name: string;
+    type: AppFieldType;
+    isRequired: boolean;
+    referenceTo?: string | null;
+    minLength?: number | null;
+    maxLength?: number | null;
+    minValue?: number | null;
+    maxValue?: number | null;
+    startDate?: Date | null;
+    endDate?: Date | null;
+    options?: string[] | null;
+    fields?: AppField[] | null;
+    child?: AppField | null;
+};
 
-    // Reference Constraints
-    referenceTo: z.string().optional(),
+export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
+    z.object({
+        id: z.string(),
+        name: z.string().min(1),
+        type: AppFieldTypeSchema,
+        isRequired: z.boolean().default(false),
 
-    // Text Constraints
-    minLength: z.number().int().nonnegative().optional(),
-    maxLength: z.number().int().nonnegative().optional(),
+        // Reference Constraints
+        referenceTo: z.string().nullable().optional(),
 
-    // Number Constraints
-    minValue: z.number().optional(),
-    maxValue: z.number().optional(),
+        // Text Constraints
+        minLength: z.number().int().nonnegative().nullable().optional(),
+        maxLength: z.number().int().nonnegative().nullable().optional(),
 
-    // Date Constraints
-    startDate: z.date().optional(),
-    endDate: z.date().optional(),
+        // Number Constraints
+        minValue: z.number().nullable().optional(),
+        maxValue: z.number().nullable().optional(),
 
-    // Dropdown Constraints
-    options: z.array(z.string()).optional()
-});
+        // Date Constraints
+        startDate: z.date().nullable().optional(),
+        endDate: z.date().nullable().optional(),
 
-export type AppField = z.infer<typeof AppFieldSchema>;
+        // Dropdown Constraints
+        options: z.array(z.string()).nullable().optional(),
+
+        // JSON Constraints
+        fields: z.array(AppFieldSchema).nullable().optional(),
+
+        // List Constraints
+        child: AppFieldSchema.nullable().optional()
+    })
+);
 
 export const AppTableSchema = z.object({
     id: z.string(),
@@ -70,7 +95,8 @@ export const AppSchemaSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     tables: z.array(AppTableSchema),
-    views: z.array(AppViewSchema)
+    views: z.array(AppViewSchema),
+    showEmpty: z.boolean().default(false)
 });
 
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
