@@ -11,7 +11,8 @@ import {
     AppViewSchema,
     type Connector
 } from '../types.js';
-import z from 'zod';
+import z, { type ZodSafeParseResult } from 'zod';
+import { LRUCache } from 'lru-cache';
 
 /**
  * Generate a Zod schema for a single AppField.
@@ -78,8 +79,15 @@ function _zodFromFields(fields: AppField[]) {
  * @param table Table to generate the validator from.
  * @returns Zod object validator from table.
  */
-function _zodFromTable(table: AppTable) {
-    return _zodFromFields(table.fields);
+function _zodFromTable(table: AppTable, appId: string, cache: LRUCache<string, z.ZodTypeAny>) {
+    const cacheKey = `${appId}:${table.id}`;
+    if (cache.has(cacheKey)) {
+        return cache.get(cacheKey)!;
+    }
+
+    const validator = _zodFromFields(table.fields);
+    cache.set(cacheKey, validator);
+    return validator;
 }
 
 /**
@@ -127,12 +135,21 @@ const tableQuerySchema = {
 export type SchemaFXConnectorsOptions = {
     schemaConnector: string;
     connectors: Record<string, Connector>;
+    validatorCacheOpts?: {
+        max?: number;
+        ttl?: number;
+    };
 };
 
 const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify,
-    { schemaConnector, connectors }
+    { schemaConnector, connectors, validatorCacheOpts }
 ) => {
+    const validatorCache = new LRUCache<string, z.ZodTypeAny>({
+        max: validatorCacheOpts?.max ?? 500,
+        ttl: validatorCacheOpts?.ttl ?? 1000 * 60 * 60
+    });
+
     const sConnector = connectors[schemaConnector];
 
     if (!sConnector) {
@@ -279,6 +296,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         schema.tables = schema.tables.map(table => {
                             if (table.id === addEl.parentId) {
                                 table.fields.push(addEl.element as AppField);
+                                validatorCache.delete(`${appId}:${table.id}`);
                             }
 
                             return table;
@@ -290,11 +308,13 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     const updateEl = request.body.element;
 
                     if (updateEl.partOf === 'tables') {
-                        schema.tables = schema.tables.map(table =>
-                            table.id === updateEl.element.id
-                                ? (updateEl.element as AppTable)
-                                : table
-                        );
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === updateEl.element.id) {
+                                validatorCache.delete(`${appId}:${table.id}`);
+                                return updateEl.element as AppTable;
+                            }
+                            return table;
+                        });
                     } else if (updateEl.partOf === 'views') {
                         schema.views = schema.views.map(view =>
                             view.id === updateEl.element.id ? (updateEl.element as AppView) : view
@@ -302,6 +322,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     } else if (updateEl.partOf === 'fields' && updateEl.parentId) {
                         schema.tables = schema.tables.map(table => {
                             if (table.id === updateEl.parentId) {
+                                validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = table.fields.map(field =>
                                     field.id === updateEl.element.id
                                         ? (updateEl.element as AppField)
@@ -318,7 +339,13 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     const delEl = request.body.element;
 
                     if (delEl.partOf === 'tables') {
-                        schema.tables = schema.tables.filter(table => table.id !== delEl.elementId);
+                        schema.tables = schema.tables.filter(table => {
+                            if (table.id === delEl.elementId) {
+                                validatorCache.delete(`${appId}:${table.id}`);
+                                return false;
+                            }
+                            return true;
+                        });
                     } else if (delEl.partOf === 'views') {
                         schema.views = schema.views.filter(view => view.id !== delEl.elementId);
                     } else if (delEl.partOf === 'fields' && delEl.parentId) {
@@ -334,6 +361,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                         schema.tables = schema.tables.map(table => {
                             if (table.id === delEl.parentId) {
+                                validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = table.fields.filter(
                                     field => field.id !== delEl.elementId
                                 );
@@ -355,6 +383,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
                         schema.tables = schema.tables.map(table => {
                             if (table.id === reoEl.parentId) {
+                                validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = _reorderElement(oldIndex, newIndex, table.fields);
                             }
 
@@ -448,11 +477,14 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
             if (!success) return response;
 
-            let row, rowResult;
+            let row: Record<string, unknown>;
+            let rowResult: ZodSafeParseResult<Record<string, unknown>>;
             switch (request.body.action) {
                 case 'add':
                     row = request.body.row;
-                    rowResult = _zodFromTable(table).safeParse(row);
+                    rowResult = _zodFromTable(table, appId, validatorCache).safeParse(
+                        row
+                    ) as ZodSafeParseResult<Record<string, unknown>>;
 
                     if (!rowResult.success) {
                         return reply.code(400).send({
@@ -469,7 +501,9 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     return connector.addRow!(appId, tableId, rowResult.data);
                 case 'update':
                     row = request.body.row;
-                    rowResult = _zodFromTable(table).safeParse(row);
+                    rowResult = _zodFromTable(table, appId, validatorCache).safeParse(
+                        row
+                    ) as ZodSafeParseResult<Record<string, unknown>>;
 
                     if (!rowResult.success) {
                         return reply.code(400).send({

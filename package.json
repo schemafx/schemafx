@@ -33,6 +33,7 @@
         "fastify": "^5.6.0",
         "fastify-healthcheck": "^5.1.0",
         "fastify-type-provider-zod": "^6.0.0",
+        "lru-cache": "^11.2.4",
         "zod": "^4.1.9"
     },
     "devDependencies": {
