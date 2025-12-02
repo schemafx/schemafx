@@ -19,3 +19,4 @@ export {
 
 // Connectors
 export { default as MemoryConnector } from './connectors/memoryConnector.js';
+export { default as FileConnector } from './connectors/fileConnector.js';
