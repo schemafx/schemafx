@@ -9,7 +9,8 @@ import {
     AppTableSchema,
     type AppView,
     AppViewSchema,
-    type Connector
+    type Connector,
+    type AppSchema
 } from '../types.js';
 import z, { type ZodSafeParseResult } from 'zod';
 import { LRUCache } from 'lru-cache';
@@ -139,15 +140,24 @@ export type SchemaFXConnectorsOptions = {
         max?: number;
         ttl?: number;
     };
+    schemaCacheOpts?: {
+        max?: number;
+        ttl?: number;
+    };
 };
 
 const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify,
-    { schemaConnector, connectors, validatorCacheOpts }
+    { schemaConnector, connectors, validatorCacheOpts, schemaCacheOpts }
 ) => {
     const validatorCache = new LRUCache<string, z.ZodTypeAny>({
         max: validatorCacheOpts?.max ?? 500,
         ttl: validatorCacheOpts?.ttl ?? 1000 * 60 * 60
+    });
+
+    const schemaCache = new LRUCache<string, AppSchema>({
+        max: schemaCacheOpts?.max ?? 100,
+        ttl: schemaCacheOpts?.ttl ?? 1000 * 60 * 5 // 5 minutes TTL
     });
 
     const sConnector = connectors[schemaConnector];
@@ -160,6 +170,16 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         throw new Error(`Missing implementation "saveSchema" on connector "${schemaConnector}".`);
     } else if (!sConnector.deleteSchema) {
         throw new Error(`Missing implementation "deleteSchema" on connector "${schemaConnector}".`);
+    }
+
+    async function getSchema(appId: string) {
+        if (schemaCache.has(appId)) {
+            return schemaCache.get(appId)!;
+        }
+
+        const schema = await sConnector.getSchema!(appId);
+        schemaCache.set(appId, schema);
+        return schema;
     }
 
     fastify.post(
@@ -207,7 +227,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                 response: { 200: AppSchemaSchema }
             }
         },
-        request => sConnector.getSchema!(request.params.appId)
+        request => getSchema(request.params.appId)
     );
 
     fastify.post(
@@ -267,7 +287,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         },
         async request => {
             const { appId } = request.params;
-            const schema = await sConnector.getSchema!(appId);
+            const schema = await getSchema(appId);
 
             switch (request.body.action) {
                 case 'add':
@@ -303,6 +323,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
+                    schemaCache.delete(appId);
                     return sConnector.saveSchema!(appId, schema);
                 case 'update':
                     const updateEl = request.body.element;
@@ -334,6 +355,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
+                    schemaCache.delete(appId);
                     return sConnector.saveSchema!(appId, schema);
                 case 'delete':
                     const delEl = request.body.element;
@@ -371,6 +393,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
+                    schemaCache.delete(appId);
                     return sConnector.saveSchema!(appId, schema);
                 case 'reorder':
                     const reoEl = request.body.element;
@@ -391,15 +414,16 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         });
                     }
 
+                    schemaCache.delete(appId);
                     return sConnector.saveSchema!(appId, schema);
             }
 
-            return sConnector.getSchema!(request.params.appId);
+            return getSchema(request.params.appId);
         }
     );
 
     async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
-        const schema = await sConnector.getSchema!(appId);
+        const schema = await getSchema(appId);
         const table = schema.tables.find(table => table.id === tableId);
 
         let response;
