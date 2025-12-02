@@ -58,7 +58,7 @@ function _zodFromField(field: AppField): z.ZodTypeAny {
             break;
     }
 
-    if (!field.isRequired) fld = fld.optional();
+    if (!field.isRequired) fld = fld.optional().nullable();
     return fld;
 }
 
