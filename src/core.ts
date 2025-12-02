@@ -17,6 +17,7 @@ import fastifyRateLimit, { type FastifyRateLimitOptions } from '@fastify/rate-li
 import fastifyHealthcheck, { type FastifyHealthcheckOptions } from 'fastify-healthcheck';
 import fastifyHelmet, { type FastifyHelmetOptions } from '@fastify/helmet';
 import fastifyJwt, { type FastifyJWTOptions } from '@fastify/jwt';
+import fastifyCompress, { type FastifyCompressOptions } from '@fastify/compress';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import connectorHandler, { type SchemaFXConnectorsOptions } from './connectors/connectorHandler.js';
@@ -27,6 +28,7 @@ export type SchemaFXOptions = {
     corsOpts?: FastifyCorsOptions;
     rateLimitOpts?: FastifyRateLimitOptions;
     healthcheckOpts?: FastifyHealthcheckOptions;
+    compressOpts?: FastifyCompressOptions;
     jwtOpts: FastifyJWTOptions;
     connectorOpts: SchemaFXConnectorsOptions;
 };
@@ -48,6 +50,7 @@ export default class SchemaFX {
         this.fastifyInstance.setSerializerCompiler(serializerCompiler);
 
         this.fastifyInstance.register(fastifyHelmet, opts.helmetOpts ?? {});
+        this.fastifyInstance.register(fastifyCompress, opts.compressOpts ?? { global: true });
 
         this.fastifyInstance.register(fastifyCors, {
             origin: true,
