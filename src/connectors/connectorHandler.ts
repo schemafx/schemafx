@@ -14,48 +14,72 @@ import {
 import z from 'zod';
 
 /**
+ * Generate a Zod schema for a single AppField.
+ * @param field Field to generate the validator from.
+ * @returns Zod schema for the field.
+ */
+function _zodFromField(field: AppField): z.ZodTypeAny {
+    let fld;
+
+    switch (field.type) {
+        case 'number':
+            fld = z.number();
+            if (typeof field.minValue === 'number') fld = fld.min(field.minValue);
+            if (typeof field.maxValue === 'number') fld = fld.max(field.maxValue);
+            break;
+        case 'boolean':
+            fld = z.boolean();
+            break;
+        case 'date':
+            fld = z.date();
+            if (field.startDate) fld = fld.min(field.startDate);
+            if (field.endDate) fld = fld.max(field.endDate);
+            break;
+        case 'email':
+            fld = z.email();
+            break;
+        case 'dropdown':
+            fld = z.enum((field.options as [string, ...string[]]) ?? []);
+            break;
+        case 'json':
+            fld = _zodFromFields(field.fields ?? []);
+            break;
+        case 'list':
+            if (field.child) {
+                fld = z.array(_zodFromField(field.child));
+            } else {
+                fld = z.array(z.any());
+            }
+            break;
+        default:
+            fld = z.string();
+            if (typeof field.minLength === 'number') fld = fld.min(field.minLength);
+            if (typeof field.maxLength === 'number') fld = fld.max(field.maxLength);
+            break;
+    }
+
+    if (!field.isRequired) fld = fld.optional();
+    return fld;
+}
+
+/**
+ * Generate a Zod object from a list of AppField definitions.
+ * @param fields List of fields to generate the validator from.
+ * @returns Zod object validator.
+ */
+function _zodFromFields(fields: AppField[]) {
+    return z.strictObject(
+        Object.fromEntries(fields.map(field => [field.id, _zodFromField(field)]))
+    );
+}
+
+/**
  * Generate a Zod object from an AppTable definition.
  * @param table Table to generate the validator from.
  * @returns Zod object validator from table.
  */
 function _zodFromTable(table: AppTable) {
-    return z.strictObject(
-        Object.fromEntries(
-            table.fields.map(field => {
-                let fld;
-
-                switch (field.type) {
-                    case 'number':
-                        fld = z.number();
-                        if (typeof field.minValue === 'number') fld = fld.min(field.minValue);
-                        if (typeof field.maxValue === 'number') fld = fld.max(field.maxValue);
-                        break;
-                    case 'boolean':
-                        fld = z.boolean();
-                        break;
-                    case 'date':
-                        fld = z.date();
-                        if (field.startDate) fld = fld.min(field.startDate);
-                        if (field.endDate) fld = fld.max(field.endDate);
-                        break;
-                    case 'email':
-                        fld = z.email();
-                        break;
-                    case 'dropdown':
-                        fld = z.enum(field.options ?? []);
-                        break;
-                    default:
-                        fld = z.string();
-                        if (typeof field.minLength === 'number') fld = fld.min(field.minLength);
-                        if (typeof field.maxLength === 'number') fld = fld.max(field.maxLength);
-                        break;
-                }
-
-                if (!field.isRequired) fld = fld?.optional();
-                return [field.id, fld];
-            })
-        )
-    );
+    return _zodFromFields(table.fields);
 }
 
 /**
