@@ -19,6 +19,7 @@ export type AppField = {
     name: string;
     type: AppFieldType;
     isRequired: boolean;
+    isKey: boolean;
     referenceTo?: string | null;
     minLength?: number | null;
     maxLength?: number | null;
@@ -37,6 +38,7 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
         name: z.string().min(1),
         type: AppFieldTypeSchema,
         isRequired: z.boolean().default(false),
+        isKey: z.boolean().default(false),
 
         // Reference Constraints
         referenceTo: z.string().nullable().optional(),
@@ -64,11 +66,25 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
     })
 );
 
+export const AppActionSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.enum(['add', 'update', 'delete', 'process']),
+    config: z
+        .object({
+            actions: z.array(z.string()).optional()
+        })
+        .optional()
+});
+
+export type AppAction = z.infer<typeof AppActionSchema>;
+
 export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     connector: z.string().min(1),
-    fields: z.array(AppFieldSchema)
+    fields: z.array(AppFieldSchema),
+    actions: z.array(AppActionSchema).default([])
 });
 
 export type AppTable = z.infer<typeof AppTableSchema>;
@@ -142,13 +158,13 @@ export abstract class Connector {
      * Update a Row from the Table.
      * @param appId Id of the Application.
      * @param tableId Id of the Table.
-     * @param rowIndex Index of the Row.
+     * @param key Key of the Row.
      * @param row Table Row.
      */
     updateRow?(
         appId: string,
         tableId: string,
-        rowIndex?: number,
+        key?: Record<string, unknown>,
         row?: AppTableRow
     ): Promise<AppTableRow[]>;
 
@@ -156,7 +172,11 @@ export abstract class Connector {
      * Delete a Row from the Table.
      * @param appId Id of the Application.
      * @param tableId Id of the Table.
-     * @param rowIndex Index of the Row.
+     * @param key Key of the Row.
      */
-    deleteRow?(appId: string, tableId: string, rowIndex?: number): Promise<AppTableRow[]>;
+    deleteRow?(
+        appId: string,
+        tableId: string,
+        key?: Record<string, unknown>
+    ): Promise<AppTableRow[]>;
 }
