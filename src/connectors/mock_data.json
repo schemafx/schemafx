@@ -10,7 +10,8 @@
                 {
                     "id": "_id",
                     "name": "ID",
-                    "type": "text"
+                    "type": "text",
+                    "isKey": true
                 },
                 {
                     "id": "name",
@@ -22,6 +23,11 @@
                     "name": "Email",
                     "type": "email"
                 }
+            ],
+            "actions": [
+                { "id": "add", "name": "Add Customer", "type": "add" },
+                { "id": "update", "name": "Update Customer", "type": "update" },
+                { "id": "delete", "name": "Delete Customer", "type": "delete" }
             ]
         },
         {
@@ -32,7 +38,8 @@
                 {
                     "id": "_id",
                     "name": "ID",
-                    "type": "text"
+                    "type": "text",
+                    "isKey": true
                 },
                 {
                     "id": "product",
@@ -50,6 +57,11 @@
                     "type": "reference",
                     "referenceTo": "customers"
                 }
+            ],
+            "actions": [
+                { "id": "add", "name": "Add Order", "type": "add" },
+                { "id": "update", "name": "Update Order", "type": "update" },
+                { "id": "delete", "name": "Delete Order", "type": "delete" }
             ]
         }
     ],

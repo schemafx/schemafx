@@ -42,12 +42,21 @@ export default class MemoryConnector extends Connector {
         return data;
     }
 
-    async updateRow(appId: string, tableId: string, rowIndex?: number, row?: AppTableRow) {
+    async updateRow(
+        appId: string,
+        tableId: string,
+        key?: Record<string, unknown>,
+        row?: AppTableRow
+    ) {
         const data = await this.getData(appId, tableId);
 
-        if (typeof rowIndex !== 'number' || !data[rowIndex] || !row) return data;
+        if (!key || !row) return data;
 
-        data[rowIndex] = { ...row };
+        const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
+
+        if (rowIndex === -1) return data;
+
+        data[rowIndex] = { ...data[rowIndex], ...row };
 
         if (!this.tables.has(appId)) this.tables.set(appId, new Map());
         this.tables.get(appId)?.set(tableId, data);
@@ -55,10 +64,14 @@ export default class MemoryConnector extends Connector {
         return data;
     }
 
-    async deleteRow(appId: string, tableId: string, rowIndex?: number) {
+    async deleteRow(appId: string, tableId: string, key?: Record<string, unknown>) {
         const data = await this.getData(appId, tableId);
 
-        if (typeof rowIndex !== 'number' || !data[rowIndex]) return data;
+        if (!key) return data;
+
+        const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
+
+        if (rowIndex === -1) return data;
 
         data.splice(rowIndex, 1);
 

@@ -79,30 +79,39 @@ export default class FileConnector extends Connector {
         return db.tables[appId][tableId];
     }
 
-    async updateRow(appId: string, tableId: string, rowIndex?: number, row?: AppTableRow) {
+    async updateRow(
+        appId: string,
+        tableId: string,
+        key?: Record<string, unknown>,
+        row?: AppTableRow
+    ) {
         const db = await this._readDB();
-        if (typeof rowIndex !== 'number' || !row) return db.tables[appId]?.[tableId] || [];
+        if (!key || !row) return db.tables[appId]?.[tableId] || [];
 
         if (!db.tables[appId]) db.tables[appId] = {};
         if (!db.tables[appId][tableId]) return [];
 
         const data = db.tables[appId][tableId];
-        if (data[rowIndex]) {
-            data[rowIndex] = { ...row };
+        const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
+
+        if (rowIndex !== -1) {
+            data[rowIndex] = { ...data[rowIndex], ...row };
             await this._writeDB(db);
         }
 
         return data;
     }
 
-    async deleteRow(appId: string, tableId: string, rowIndex?: number) {
+    async deleteRow(appId: string, tableId: string, key?: Record<string, unknown>) {
         const db = await this._readDB();
-        if (typeof rowIndex !== 'number') return db.tables[appId]?.[tableId] || [];
+        if (!key) return db.tables[appId]?.[tableId] || [];
 
         if (!db.tables[appId] || !db.tables[appId][tableId]) return [];
 
         const data = db.tables[appId][tableId];
-        if (data[rowIndex]) {
+        const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
+
+        if (rowIndex !== -1) {
             data.splice(rowIndex, 1);
             await this._writeDB(db);
         }

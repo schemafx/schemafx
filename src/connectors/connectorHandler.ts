@@ -10,9 +10,10 @@ import {
     type AppView,
     AppViewSchema,
     type Connector,
-    type AppSchema
+    type AppSchema,
+    type AppTableRow
 } from '../types.js';
-import z, { type ZodSafeParseResult } from 'zod';
+import z from 'zod';
 import { LRUCache } from 'lru-cache';
 
 /**
@@ -112,7 +113,7 @@ const tableQuerySchema = {
         tableId: z.string().min(1)
     }),
     response: {
-        200: z.array(AppTableRowSchema),
+        200: z.any(),
         500: z.object({
             error: z.string(),
             message: z.string()
@@ -133,9 +134,15 @@ const tableQuerySchema = {
     }
 };
 
+function _validateTableKeys(table: AppTable) {
+    const hasKey = table.fields.some(f => f.isKey);
+    if (!hasKey) throw new Error(`Table ${table.name} must have at least one key field.`);
+}
+
 export type SchemaFXConnectorsOptions = {
     schemaConnector: string;
     connectors: Record<string, Connector>;
+    maxRecursiveDepth?: number;
     validatorCacheOpts?: {
         max?: number;
         ttl?: number;
@@ -148,7 +155,7 @@ export type SchemaFXConnectorsOptions = {
 
 const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify,
-    { schemaConnector, connectors, validatorCacheOpts, schemaCacheOpts }
+    { schemaConnector, connectors, maxRecursiveDepth, validatorCacheOpts, schemaCacheOpts }
 ) => {
     const validatorCache = new LRUCache<string, z.ZodTypeAny>({
         max: validatorCacheOpts?.max ?? 500,
@@ -161,6 +168,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     });
 
     const sConnector = connectors[schemaConnector];
+    const MAX_DEPTH = maxRecursiveDepth ?? 100;
 
     if (!sConnector) {
         throw new Error(`Unrecognized connector "${schemaConnector}".`);
@@ -282,140 +290,179 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         ])
                     })
                 ]),
-                response: { 200: AppSchemaSchema }
+                response: {
+                    200: AppSchemaSchema,
+                    400: z.object({
+                        error: z.string(),
+                        message: z.string()
+                    })
+                }
             }
         },
-        async request => {
+        async (request, reply) => {
             const { appId } = request.params;
             const schema = await getSchema(appId);
 
-            switch (request.body.action) {
-                case 'add':
-                    const addEl = request.body.element;
+            try {
+                switch (request.body.action) {
+                    case 'add':
+                        const addEl = request.body.element;
 
-                    if (addEl.partOf === 'tables') {
-                        schema.tables.push(addEl.element as AppTable);
-                    } else if (addEl.partOf === 'views') {
-                        schema.views.push(addEl.element as AppView);
-                    } else if (addEl.partOf === 'fields' && addEl.parentId) {
-                        const oldFieldsLength =
-                            schema.tables.find(table => table.id === addEl.parentId)?.fields
-                                ?.length ?? 0;
+                        if (addEl.partOf === 'tables') {
+                            _validateTableKeys(addEl.element as AppTable);
+                            schema.tables.push(addEl.element as AppTable);
+                        } else if (addEl.partOf === 'views') {
+                            schema.views.push(addEl.element as AppView);
+                        } else if (addEl.partOf === 'fields' && addEl.parentId) {
+                            const oldFieldsLength =
+                                schema.tables.find(table => table.id === addEl.parentId)?.fields
+                                    ?.length ?? 0;
 
-                        schema.views = schema.views.map(view => {
-                            if (
-                                view.tableId === addEl.parentId &&
-                                view.fields.length === oldFieldsLength
-                            ) {
-                                view.fields.push((addEl.element as AppField).id);
-                            }
+                            schema.views = schema.views.map(view => {
+                                if (
+                                    view.tableId === addEl.parentId &&
+                                    view.fields.length === oldFieldsLength
+                                ) {
+                                    view.fields.push((addEl.element as AppField).id);
+                                }
 
-                            return view;
-                        });
+                                return view;
+                            });
 
-                        schema.tables = schema.tables.map(table => {
-                            if (table.id === addEl.parentId) {
-                                table.fields.push(addEl.element as AppField);
-                                validatorCache.delete(`${appId}:${table.id}`);
-                            }
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === addEl.parentId) {
+                                    table.fields.push(addEl.element as AppField);
+                                    validatorCache.delete(`${appId}:${table.id}`);
+                                }
 
-                            return table;
-                        });
-                    }
+                                return table;
+                            });
+                        }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
-                case 'update':
-                    const updateEl = request.body.element;
+                        schemaCache.delete(appId);
+                        return sConnector.saveSchema!(appId, schema);
+                    case 'update':
+                        const updateEl = request.body.element;
 
-                    if (updateEl.partOf === 'tables') {
-                        schema.tables = schema.tables.map(table => {
-                            if (table.id === updateEl.element.id) {
-                                validatorCache.delete(`${appId}:${table.id}`);
-                                return updateEl.element as AppTable;
-                            }
-                            return table;
-                        });
-                    } else if (updateEl.partOf === 'views') {
-                        schema.views = schema.views.map(view =>
-                            view.id === updateEl.element.id ? (updateEl.element as AppView) : view
-                        );
-                    } else if (updateEl.partOf === 'fields' && updateEl.parentId) {
-                        schema.tables = schema.tables.map(table => {
-                            if (table.id === updateEl.parentId) {
-                                validatorCache.delete(`${appId}:${table.id}`);
-                                table.fields = table.fields.map(field =>
-                                    field.id === updateEl.element.id
-                                        ? (updateEl.element as AppField)
-                                        : field
-                                );
-                            }
+                        if (updateEl.partOf === 'tables') {
+                            _validateTableKeys(updateEl.element as AppTable);
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === updateEl.element.id) {
+                                    validatorCache.delete(`${appId}:${table.id}`);
+                                    return updateEl.element as AppTable;
+                                }
+                                return table;
+                            });
+                        } else if (updateEl.partOf === 'views') {
+                            schema.views = schema.views.map(view =>
+                                view.id === updateEl.element.id
+                                    ? (updateEl.element as AppView)
+                                    : view
+                            );
+                        } else if (updateEl.partOf === 'fields' && updateEl.parentId) {
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === updateEl.parentId) {
+                                    const updatedFields = table.fields.map(field =>
+                                        field.id === updateEl.element.id
+                                            ? (updateEl.element as AppField)
+                                            : field
+                                    );
+                                    const hasKey = updatedFields.some(f => f.isKey);
+                                    if (!hasKey) {
+                                        throw new Error(
+                                            `Table ${table.name} must have at least one key field.`
+                                        );
+                                    }
 
-                            return table;
-                        });
-                    }
+                                    validatorCache.delete(`${appId}:${table.id}`);
+                                    table.fields = updatedFields;
+                                }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
-                case 'delete':
-                    const delEl = request.body.element;
+                                return table;
+                            });
+                        }
 
-                    if (delEl.partOf === 'tables') {
-                        schema.tables = schema.tables.filter(table => {
-                            if (table.id === delEl.elementId) {
-                                validatorCache.delete(`${appId}:${table.id}`);
-                                return false;
-                            }
-                            return true;
-                        });
-                    } else if (delEl.partOf === 'views') {
-                        schema.views = schema.views.filter(view => view.id !== delEl.elementId);
-                    } else if (delEl.partOf === 'fields' && delEl.parentId) {
-                        schema.views = schema.views.map(view => {
-                            if (view.tableId === delEl.parentId) {
-                                view.fields = view.fields.filter(
-                                    field => field !== delEl.elementId
-                                );
-                            }
+                        schemaCache.delete(appId);
+                        return sConnector.saveSchema!(appId, schema);
+                    case 'delete':
+                        const delEl = request.body.element;
 
-                            return view;
-                        });
+                        if (delEl.partOf === 'tables') {
+                            schema.tables = schema.tables.filter(table => {
+                                if (table.id === delEl.elementId) {
+                                    validatorCache.delete(`${appId}:${table.id}`);
+                                    return false;
+                                }
 
-                        schema.tables = schema.tables.map(table => {
-                            if (table.id === delEl.parentId) {
-                                validatorCache.delete(`${appId}:${table.id}`);
-                                table.fields = table.fields.filter(
-                                    field => field.id !== delEl.elementId
-                                );
-                            }
+                                return true;
+                            });
+                        } else if (delEl.partOf === 'views') {
+                            schema.views = schema.views.filter(view => view.id !== delEl.elementId);
+                        } else if (delEl.partOf === 'fields' && delEl.parentId) {
+                            schema.views = schema.views.map(view => {
+                                if (view.tableId === delEl.parentId) {
+                                    view.fields = view.fields.filter(
+                                        field => field !== delEl.elementId
+                                    );
+                                }
 
-                            return table;
-                        });
-                    }
+                                return view;
+                            });
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
-                case 'reorder':
-                    const reoEl = request.body.element;
-                    const { oldIndex, newIndex } = request.body;
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === delEl.parentId) {
+                                    // Check if deleting this field leaves the table without a key
+                                    const remainingFields = table.fields.filter(
+                                        field => field.id !== delEl.elementId
+                                    );
+                                    const hasKey = remainingFields.some(f => f.isKey);
+                                    if (!hasKey) {
+                                        throw new Error(
+                                            `Cannot delete field. Table ${table.name} must have at least one key field.`
+                                        );
+                                    }
 
-                    if (reoEl.partOf === 'tables') {
-                        schema.tables = _reorderElement(oldIndex, newIndex, schema.tables);
-                    } else if (reoEl.partOf === 'views') {
-                        schema.views = _reorderElement(oldIndex, newIndex, schema.views);
-                    } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
-                        schema.tables = schema.tables.map(table => {
-                            if (table.id === reoEl.parentId) {
-                                validatorCache.delete(`${appId}:${table.id}`);
-                                table.fields = _reorderElement(oldIndex, newIndex, table.fields);
-                            }
+                                    validatorCache.delete(`${appId}:${table.id}`);
+                                    table.fields = remainingFields;
+                                }
 
-                            return table;
-                        });
-                    }
+                                return table;
+                            });
+                        }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                        schemaCache.delete(appId);
+                        return sConnector.saveSchema!(appId, schema);
+                    case 'reorder':
+                        const reoEl = request.body.element;
+                        const { oldIndex, newIndex } = request.body;
+
+                        if (reoEl.partOf === 'tables') {
+                            schema.tables = _reorderElement(oldIndex, newIndex, schema.tables);
+                        } else if (reoEl.partOf === 'views') {
+                            schema.views = _reorderElement(oldIndex, newIndex, schema.views);
+                        } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === reoEl.parentId) {
+                                    validatorCache.delete(`${appId}:${table.id}`);
+                                    table.fields = _reorderElement(
+                                        oldIndex,
+                                        newIndex,
+                                        table.fields
+                                    );
+                                }
+
+                                return table;
+                            });
+                        }
+
+                        schemaCache.delete(appId);
+                        return sConnector.saveSchema!(appId, schema);
+                }
+            } catch (err: unknown) {
+                return reply.code(400).send({
+                    error: 'Validation Error',
+                    message: (err as Error).message
+                });
             }
 
             return getSchema(request.params.appId);
@@ -467,31 +514,35 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         }
     );
 
+    function extractKeys(
+        row: AppTableRow,
+        keyFields: (keyof AppTableRow)[]
+    ): Record<keyof AppTableRow, unknown> {
+        const key: Record<keyof AppTableRow, unknown> = {};
+        for (const fieldId of keyFields) {
+            if (row[fieldId] !== undefined) {
+                key[fieldId] = row[fieldId];
+            }
+        }
+        return key;
+    }
+
     fastify.post(
         '/apps/:appId/data/:tableId',
         {
             onRequest: [fastify.authenticate],
             schema: {
-                body: z.discriminatedUnion('action', [
-                    z.object({
-                        action: z.literal('add'),
-                        row: AppTableRowSchema
-                    }),
-                    z.object({
-                        action: z.literal('update'),
-                        rowIndex: z.number().nonnegative(),
-                        row: AppTableRowSchema
-                    }),
-                    z.object({
-                        action: z.literal('delete'),
-                        rowIndex: z.number().nonnegative()
-                    })
-                ]),
+                body: z.object({
+                    actionId: z.string().min(1),
+                    rows: z.array(AppTableRowSchema).optional().default([]),
+                    payload: z.any().optional()
+                }),
                 ...tableQuerySchema
             }
         },
         async (request, reply) => {
             const { appId, tableId } = request.params;
+            const { actionId, rows } = request.body;
 
             const { response, success, connector, table } = await handleTable(
                 appId,
@@ -499,59 +550,100 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                 reply
             );
 
-            if (!success) return response;
+            if (!success || !table || !connector) return response;
 
-            let row: Record<string, unknown>;
-            let rowResult: ZodSafeParseResult<Record<string, unknown>>;
-            switch (request.body.action) {
-                case 'add':
-                    row = request.body.row;
-                    rowResult = _zodFromTable(table, appId, validatorCache).safeParse(
-                        row
-                    ) as ZodSafeParseResult<Record<string, unknown>>;
+            const keyFields = table.fields.filter(f => f.isKey).map(f => f.id);
 
-                    if (!rowResult.success) {
-                        return reply.code(400).send({
-                            error: 'Validation Error',
-                            message: 'Invalid input data',
-                            details: rowResult.error.issues.map(err => ({
-                                field: err.path.join('.'),
-                                message: err.message,
-                                code: err.code
-                            }))
-                        });
+            async function executeAction(
+                actId: string,
+                currentRows: AppTableRow[],
+                depth: number
+            ): Promise<unknown> {
+                if (depth > MAX_DEPTH) {
+                    throw new Error('Max recursion depth exceeded.');
+                }
+
+                const action = table!.actions?.find(a => a.id === actId);
+                if (!action) {
+                    throw new Error(`Action ${actId} not found.`);
+                }
+
+                switch (action.type) {
+                    case 'add': {
+                        const validator = _zodFromTable(table!, appId, validatorCache);
+                        for (const row of currentRows) {
+                            const rowResult = validator.safeParse(row);
+                            if (!rowResult.success) {
+                                throw new Error(
+                                    `Validation Error: ${JSON.stringify(rowResult.error.issues)}`
+                                );
+                            }
+
+                            await connector?.addRow?.(
+                                appId,
+                                tableId,
+                                rowResult.data as Record<string, unknown>
+                            );
+                        }
+
+                        return connector?.getData?.(appId, tableId) || [];
                     }
+                    case 'update': {
+                        const validator = _zodFromTable(table!, appId, validatorCache);
+                        for (const row of currentRows) {
+                            const rowResult = validator.safeParse(row);
+                            if (!rowResult.success) {
+                                throw new Error(
+                                    `Validation Error: ${JSON.stringify(rowResult.error.issues)}`
+                                );
+                            }
 
-                    return connector.addRow!(appId, tableId, rowResult.data);
-                case 'update':
-                    row = request.body.row;
-                    rowResult = _zodFromTable(table, appId, validatorCache).safeParse(
-                        row
-                    ) as ZodSafeParseResult<Record<string, unknown>>;
+                            const key = extractKeys(row, keyFields);
+                            if (Object.keys(key).length === 0) continue;
 
-                    if (!rowResult.success) {
-                        return reply.code(400).send({
-                            error: 'Validation Error',
-                            message: 'Invalid input data',
-                            details: rowResult.error.issues.map(err => ({
-                                field: err.path.join('.'),
-                                message: err.message,
-                                code: err.code
-                            }))
-                        });
+                            await connector?.updateRow?.(
+                                appId,
+                                tableId,
+                                key,
+                                rowResult.data as Record<string, unknown>
+                            );
+                        }
+
+                        return connector?.getData?.(appId, tableId) || [];
                     }
+                    case 'delete': {
+                        for (const row of currentRows) {
+                            const key = extractKeys(row, keyFields);
+                            if (Object.keys(key).length === 0) continue;
 
-                    return connector.updateRow!(
-                        appId,
-                        tableId,
-                        request.body.rowIndex,
-                        rowResult.data
-                    );
-                case 'delete':
-                    return connector.deleteRow!(appId, tableId, request.body.rowIndex);
+                            await connector?.deleteRow?.(appId, tableId, key);
+                        }
+
+                        return connector?.getData?.(appId, tableId) || [];
+                    }
+                    case 'process': {
+                        const subActions = action.config?.actions || [];
+                        let lastResult;
+
+                        for (const subActionId of subActions) {
+                            lastResult = await executeAction(subActionId, currentRows, depth + 1);
+                        }
+
+                        return lastResult;
+                    }
+                    default:
+                        return null;
+                }
             }
 
-            return connector.getData!(appId, tableId);
+            try {
+                return executeAction(actionId, rows, 0);
+            } catch (error: unknown) {
+                return reply.code(400).send({
+                    error: 'Action Error',
+                    message: (error as Error).message
+                });
+            }
         }
     );
 };
