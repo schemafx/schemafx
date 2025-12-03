@@ -11,7 +11,9 @@ import {
     AppViewSchema,
     type Connector,
     type AppSchema,
-    type AppTableRow
+    type AppTableRow,
+    AppActionSchema,
+    type AppAction
 } from '../types.js';
 import z from 'zod';
 import { LRUCache } from 'lru-cache';
@@ -260,6 +262,11 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                                 partOf: z.literal('fields'),
                                 element: AppFieldSchema,
                                 parentId: z.string().min(1)
+                            }),
+                            z.object({
+                                partOf: z.literal('actions'),
+                                element: AppActionSchema,
+                                parentId: z.string().min(1)
                             })
                         ])
                     }),
@@ -271,7 +278,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                                 elementId: z.string().min(1)
                             }),
                             z.object({
-                                partOf: z.literal('fields'),
+                                partOf: z.enum(['fields', 'actions']),
                                 elementId: z.string().min(1),
                                 parentId: z.string().min(1)
                             })
@@ -284,7 +291,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         element: z.discriminatedUnion('partOf', [
                             z.object({ partOf: z.enum(['tables', 'views']) }),
                             z.object({
-                                partOf: z.literal('fields'),
+                                partOf: z.enum(['fields', 'actions']),
                                 parentId: z.string().min(1)
                             })
                         ])
@@ -337,6 +344,14 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                                 return table;
                             });
+                        } else if (addEl.partOf === 'actions' && addEl.parentId) {
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === addEl.parentId) {
+                                    table.actions.push(addEl.element as AppAction);
+                                }
+
+                                return table;
+                            });
                         }
 
                         schemaCache.delete(appId);
@@ -376,6 +391,18 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                                     validatorCache.delete(`${appId}:${table.id}`);
                                     table.fields = updatedFields;
+                                }
+
+                                return table;
+                            });
+                        } else if (updateEl.partOf === 'actions' && updateEl.parentId) {
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === updateEl.parentId) {
+                                    table.actions = table.actions.map(action =>
+                                        action.id === updateEl.element.id
+                                            ? (updateEl.element as AppAction)
+                                            : action
+                                    );
                                 }
 
                                 return table;
@@ -428,6 +455,16 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                                 return table;
                             });
+                        } else if (delEl.partOf === 'actions' && delEl.parentId) {
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === delEl.parentId) {
+                                    table.actions = table.actions.filter(
+                                        action => action.id !== delEl.elementId
+                                    );
+                                }
+
+                                return table;
+                            });
                         }
 
                         schemaCache.delete(appId);
@@ -447,6 +484,18 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                                         oldIndex,
                                         newIndex,
                                         table.fields
+                                    );
+                                }
+
+                                return table;
+                            });
+                        } else if (reoEl.partOf === 'actions' && reoEl.parentId) {
+                            schema.tables = schema.tables.map(table => {
+                                if (table.id === reoEl.parentId) {
+                                    table.actions = _reorderElement(
+                                        oldIndex,
+                                        newIndex,
+                                        table.actions
                                     );
                                 }
 
