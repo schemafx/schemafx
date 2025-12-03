@@ -443,7 +443,6 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
                             schema.tables = schema.tables.map(table => {
                                 if (table.id === reoEl.parentId) {
-                                    validatorCache.delete(`${appId}:${table.id}`);
                                     table.fields = _reorderElement(
                                         oldIndex,
                                         newIndex,
