@@ -70,11 +70,7 @@ export const AppActionSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(['add', 'update', 'delete', 'process']),
-    config: z
-        .object({
-            actions: z.array(z.string()).optional()
-        })
-        .optional()
+    config: z.looseObject({}).default({})
 });
 
 export type AppAction = z.infer<typeof AppActionSchema>;
@@ -102,8 +98,7 @@ export const AppViewSchema = z.object({
     name: z.string().min(1),
     tableId: z.string(),
     type: AppViewTypeSchema,
-    fields: z.array(z.string()),
-    showEmpty: z.boolean().optional().default(false)
+    config: z.looseObject({}).default({})
 });
 
 export type AppView = z.infer<typeof AppViewSchema>;

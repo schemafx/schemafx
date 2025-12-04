@@ -39,7 +39,7 @@ export default class FileConnector extends Connector {
         let schema = db.schemas[appId];
 
         if (!schema) {
-            schema = { ...mock_data } as AppSchema;
+            schema = { ...mock_data } as unknown as AppSchema;
             db.schemas[appId] = schema;
             await this._writeDB(db);
         }

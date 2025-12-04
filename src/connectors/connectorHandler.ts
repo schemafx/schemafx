@@ -328,9 +328,12 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                             schema.views = schema.views.map(view => {
                                 if (
                                     view.tableId === addEl.parentId &&
-                                    view.fields.length === oldFieldsLength
+                                    view.config.fields &&
+                                    (view.config.fields as string[]).length === oldFieldsLength
                                 ) {
-                                    view.fields.push((addEl.element as AppField).id);
+                                    (view.config.fields as string[]).push(
+                                        (addEl.element as AppField).id
+                                    );
                                 }
 
                                 return view;
@@ -427,8 +430,8 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                             schema.views = schema.views.filter(view => view.id !== delEl.elementId);
                         } else if (delEl.partOf === 'fields' && delEl.parentId) {
                             schema.views = schema.views.map(view => {
-                                if (view.tableId === delEl.parentId) {
-                                    view.fields = view.fields.filter(
+                                if (view.tableId === delEl.parentId && view.config.fields) {
+                                    view.config.fields = (view.config.fields as string[]).filter(
                                         field => field !== delEl.elementId
                                     );
                                 }
@@ -670,7 +673,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                         return connector?.getData?.(appId, tableId) || [];
                     }
                     case 'process': {
-                        const subActions = action.config?.actions || [];
+                        const subActions = (action.config?.actions as string[]) || [];
                         let lastResult;
 
                         for (const subActionId of subActions) {

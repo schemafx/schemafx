@@ -9,7 +9,7 @@ export default class MemoryConnector extends Connector {
         let schema = this.schemas.get(appId);
 
         if (!schema) {
-            schema = { ...mock_data } as AppSchema;
+            schema = { ...mock_data } as unknown as AppSchema;
             await this.saveSchema(appId, schema);
         }
 

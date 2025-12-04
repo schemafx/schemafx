@@ -71,28 +71,36 @@
             "name": "Customers Table",
             "tableId": "customers",
             "type": "table",
-            "fields": ["name", "email"]
+            "config": {
+                "fields": ["name", "email"]
+            }
         },
         {
             "id": "customers_form",
             "name": "New Customer Form",
             "tableId": "customers",
             "type": "form",
-            "fields": ["name", "email"]
+            "config": {
+                "fields": ["name", "email"]
+            }
         },
         {
             "id": "orders_table",
             "name": "Orders Table",
             "tableId": "orders",
             "type": "table",
-            "fields": ["product", "price", "customer"]
+            "config": {
+                "fields": ["product", "price", "customer"]
+            }
         },
         {
             "id": "orders_form",
             "name": "New Order Form",
             "tableId": "orders",
             "type": "form",
-            "fields": ["product", "price", "customer"]
+            "config": {
+                "fields": ["product", "price", "customer"]
+            }
         }
     ]
 }
