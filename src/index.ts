@@ -14,7 +14,9 @@ export {
     type AppViewType,
     type AppView,
     type AppSchema,
-    Connector
+    Connector,
+    type ConnectorCapabilities,
+    type TableQueryOptions
 } from './types.js';
 
 // Connectors

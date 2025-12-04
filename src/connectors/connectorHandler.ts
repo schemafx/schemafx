@@ -13,7 +13,9 @@ import {
     type AppSchema,
     type AppTableRow,
     AppActionSchema,
-    type AppAction
+    type AppAction,
+    TableQueryOptionsSchema,
+    TableQueryOptions
 } from '../types.js';
 import z from 'zod';
 import { LRUCache } from 'lru-cache';
@@ -113,6 +115,9 @@ const tableQuerySchema = {
     params: z.object({
         appId: z.string().min(1),
         tableId: z.string().min(1)
+    }),
+    querystring: z.object({
+        query: z.string().optional()
     }),
     response: {
         200: z.any(),
@@ -557,11 +562,133 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         },
         async (request, reply) => {
             const { appId, tableId } = request.params;
+            const { query: queryStr } = request.query;
 
             const { response, success, connector } = await handleTable(appId, tableId, reply);
             if (!success) return response;
 
-            return connector.getData!(appId, tableId);
+            let query;
+            if (queryStr) {
+                try {
+                    query = JSON.parse(queryStr);
+                    const parsed = TableQueryOptionsSchema.safeParse(query);
+                    if (!parsed.success) {
+                        return reply.code(400).send({
+                            error: 'Validation Error',
+                            message: 'Invalid query parameters.',
+                            details: parsed.error.issues.map(issue => ({
+                                field: issue.path.join('.'),
+                                message: issue.message,
+                                code: issue.code
+                            }))
+                        });
+                    }
+
+                    query = parsed.data;
+                } catch (err: unknown) {
+                    reply.log.error(err);
+                    return reply.code(400).send({
+                        error: 'Validation Error',
+                        message: 'Invalid JSON in query parameter.'
+                    });
+                }
+            }
+
+            let finalQuery: TableQueryOptions | undefined;
+            let qMissingCaps: TableQueryOptions | undefined;
+
+            if (query) {
+                const capabilities = connector.getCapabilities
+                    ? await connector.getCapabilities(appId, tableId)
+                    : {};
+
+                if (query.filters?.length) {
+                    let filterValid = true;
+                    for (const filter of query.filters) {
+                        if (capabilities.filter?.[filter.operator]) continue;
+
+                        filterValid = false;
+                        break;
+                    }
+
+                    if (filterValid) {
+                        if (!finalQuery) finalQuery = {};
+                        finalQuery.filters = query.filters;
+                    } else {
+                        if (!qMissingCaps) qMissingCaps = {};
+                        qMissingCaps.filters = query.filters;
+                    }
+                }
+
+                if (typeof query.limit === 'number') {
+                    if (
+                        // Cannot have limit from query if missing filters.
+                        // Would otherwise make inaccurate limit.
+                        !qMissingCaps?.filters &&
+                        typeof capabilities.limit?.min === 'number' &&
+                        typeof capabilities.limit?.max === 'number' &&
+                        query.limit >= capabilities.limit.min &&
+                        query.limit <= capabilities.limit.max
+                    ) {
+                        if (!finalQuery) finalQuery = {};
+                        finalQuery.limit = query.limit;
+                    } else {
+                        if (!qMissingCaps) qMissingCaps = {};
+                        qMissingCaps.limit = query.limit;
+                    }
+                }
+
+                if (typeof query.offset === 'number') {
+                    if (
+                        // Cannot have offset from query if missing filters.
+                        // Would otherwise make inaccurate offset.
+                        !qMissingCaps?.filters &&
+                        typeof capabilities.offset?.min === 'number' &&
+                        typeof capabilities.offset?.max === 'number' &&
+                        query.offset >= capabilities.offset.min &&
+                        query.offset <= capabilities.offset.max
+                    ) {
+                        if (!finalQuery) finalQuery = {};
+                        finalQuery.offset = query.offset;
+                    } else {
+                        if (!qMissingCaps) qMissingCaps = {};
+                        qMissingCaps.offset = query.offset;
+                    }
+                }
+            }
+
+            let data = await connector.getData!(appId, tableId, finalQuery);
+            if (!qMissingCaps) return data;
+
+            if (qMissingCaps.filters) {
+                data = data.filter(row =>
+                    qMissingCaps.filters!.every(filter => {
+                        const rowValue = row[filter.field] as unknown;
+                        switch (filter.operator) {
+                            case 'eq':
+                                return rowValue === filter.value;
+                            case 'ne':
+                                return rowValue !== filter.value;
+                            case 'gt':
+                                return (rowValue as number) > filter.value;
+                            case 'gte':
+                                return (rowValue as number) >= filter.value;
+                            case 'lt':
+                                return (rowValue as number) < filter.value;
+                            case 'lte':
+                                return (rowValue as number) <= filter.value;
+                            case 'contains':
+                                return String(rowValue).includes(String(filter.value));
+                            default:
+                                return true;
+                        }
+                    })
+                );
+            }
+
+            if (typeof qMissingCaps.offset === 'number') data = data.slice(qMissingCaps.offset);
+            if (typeof qMissingCaps.limit === 'number') data = data.slice(0, qMissingCaps.limit);
+            return data;
         }
     );
 

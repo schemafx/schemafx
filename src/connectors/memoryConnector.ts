@@ -5,6 +5,12 @@ export default class MemoryConnector extends Connector {
     schemas: Map<string, AppSchema> = new Map();
     tables: Map<string, Map<string, AppTableRow[]>> = new Map();
 
+    async getCapabilities() {
+        // In-Memory capabilities only.
+        // Default capability handler.
+        return {};
+    }
+
     async getSchema(appId: string) {
         let schema = this.schemas.get(appId);
 
