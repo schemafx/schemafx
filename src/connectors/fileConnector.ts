@@ -15,6 +15,12 @@ export default class FileConnector extends Connector {
         this.filePath = filePath;
     }
 
+    async getCapabilities() {
+        // In-Memory capabilities only.
+        // Default capability handler.
+        return {};
+    }
+
     private async _readDB(): Promise<FileDB> {
         try {
             const data = await readFile(this.filePath, 'utf-8');

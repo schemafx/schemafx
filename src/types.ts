@@ -112,7 +112,33 @@ export const AppSchemaSchema = z.object({
 
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
 
+export const QueryFilterSchema = z.object({
+    field: z.string(),
+    operator: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains']),
+    value: z.any()
+});
+
+export type ConnectorCapabilities = {
+    filter?: Partial<Record<z.infer<typeof QueryFilterSchema.shape.operator>, boolean>>;
+    limit?: { min?: number; max?: number };
+    offset?: { min?: number; max?: number };
+};
+
+export const TableQueryOptionsSchema = z.object({
+    filters: z.array(QueryFilterSchema).optional(),
+    limit: z.number().int().nonnegative().optional(),
+    offset: z.number().int().nonnegative().optional()
+});
+
+export type TableQueryOptions = z.infer<typeof TableQueryOptionsSchema>;
+
 export abstract class Connector {
+    /**
+     * Get the capabilities of the connector.
+     * @returns Connector Capabilities.
+     */
+    getCapabilities?(appId: string, tableId: string): Promise<ConnectorCapabilities>;
+
     /**
      * Retrieve a Schema.
      * @param appId Id of the Application.
@@ -138,8 +164,9 @@ export abstract class Connector {
      * Get data from a Table.
      * @param appId Id of the Application.
      * @param tableId Id of the Table.
+     * @param query Query Options.
      */
-    getData?(appId: string, tableId: string): Promise<AppTableRow[]>;
+    getData?(appId: string, tableId: string, query?: TableQueryOptions): Promise<AppTableRow[]>;
 
     /**
      * Add a new Row to the Table.
