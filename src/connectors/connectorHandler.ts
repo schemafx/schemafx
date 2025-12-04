@@ -660,9 +660,9 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
             let data = await connector.getData!(appId, tableId, finalQuery);
             if (!qMissingCaps) return data;
 
-            if (!qMissingCaps.filters) {
-                data = data.filter(row => {
-                    return qMissingCaps.filters!.every(filter => {
+            if (qMissingCaps.filters) {
+                data = data.filter(row =>
+                    qMissingCaps.filters!.every(filter => {
                         const rowValue = row[filter.field] as unknown;
                         switch (filter.operator) {
                             case 'eq':
@@ -682,12 +682,13 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                             default:
                                 return true;
                         }
-                    });
-                });
+                    })
+                );
             }
 
             if (typeof qMissingCaps.offset === 'number') data = data.slice(qMissingCaps.offset);
             if (typeof qMissingCaps.limit === 'number') data = data.slice(0, qMissingCaps.limit);
+            return data;
         }
     );
 
