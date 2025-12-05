@@ -15,7 +15,7 @@ import {
     AppActionSchema,
     type AppAction,
     TableQueryOptionsSchema,
-    TableQueryOptions
+    type TableQueryOptions
 } from '../types.js';
 import z from 'zod';
 import { LRUCache } from 'lru-cache';
