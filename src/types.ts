@@ -135,9 +135,10 @@ export type TableQueryOptions = z.infer<typeof TableQueryOptionsSchema>;
 export abstract class Connector {
     /**
      * Get the capabilities of the connector.
+     * @param table Table to get capabilities for.
      * @returns Connector Capabilities.
      */
-    getCapabilities?(appId: string, tableId: string): Promise<ConnectorCapabilities>;
+    getCapabilities?(table: AppTable): Promise<ConnectorCapabilities>;
 
     /**
      * Retrieve a Schema.
@@ -162,43 +163,34 @@ export abstract class Connector {
 
     /**
      * Get data from a Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param query Query Options.
      */
-    getData?(appId: string, tableId: string, query?: TableQueryOptions): Promise<AppTableRow[]>;
+    getData?(table: AppTable, query?: TableQueryOptions): Promise<AppTableRow[]>;
 
     /**
      * Add a new Row to the Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param row Table Row.
      */
-    addRow?(appId: string, tableId: string, row?: AppTableRow): Promise<AppTableRow[]>;
+    addRow?(table: AppTable, row?: AppTableRow): Promise<AppTableRow[]>;
 
     /**
      * Update a Row from the Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param key Key of the Row.
      * @param row Table Row.
      */
     updateRow?(
-        appId: string,
-        tableId: string,
+        table: AppTable,
         key?: Record<string, unknown>,
         row?: AppTableRow
     ): Promise<AppTableRow[]>;
 
     /**
      * Delete a Row from the Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param key Key of the Row.
      */
-    deleteRow?(
-        appId: string,
-        tableId: string,
-        key?: Record<string, unknown>
-    ): Promise<AppTableRow[]>;
+    deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<AppTableRow[]>;
 }

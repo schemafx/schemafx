@@ -1,10 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { Connector, type AppSchema, type AppTableRow } from '../types.js';
+import { Connector, type AppSchema, type AppTableRow, type AppTable } from '../types.js';
 import mock_data from './mock_data.json' with { type: 'json' };
 
 type FileDB = {
     schemas: Record<string, AppSchema>;
-    tables: Record<string, Record<string, AppTableRow[]>>;
+    tables: Record<string, AppTableRow[]>;
 };
 
 export default class FileConnector extends Connector {
@@ -66,38 +66,30 @@ export default class FileConnector extends Connector {
         await this._writeDB(db);
     }
 
-    async getData(appId: string, tableId: string) {
+    async getData(table: AppTable) {
         const db = await this._readDB();
-        if (!db.tables[appId]) db.tables[appId] = {};
-        return db.tables[appId][tableId] || [];
+        return db.tables[table.id] || [];
     }
 
-    async addRow(appId: string, tableId: string, row?: AppTableRow) {
+    async addRow(table: AppTable, row?: AppTableRow) {
         const db = await this._readDB();
-        if (!row) return db.tables[appId]?.[tableId] || [];
+        if (!row) return db.tables[table.id] || [];
 
-        if (!db.tables[appId]) db.tables[appId] = {};
-        if (!db.tables[appId][tableId]) db.tables[appId][tableId] = [];
+        if (!db.tables[table.id]) db.tables[table.id] = [];
 
-        db.tables[appId][tableId].push(row);
+        db.tables[table.id].push(row);
         await this._writeDB(db);
 
-        return db.tables[appId][tableId];
+        return db.tables[table.id];
     }
 
-    async updateRow(
-        appId: string,
-        tableId: string,
-        key?: Record<string, unknown>,
-        row?: AppTableRow
-    ) {
+    async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
         const db = await this._readDB();
-        if (!key || !row) return db.tables[appId]?.[tableId] || [];
+        if (!key || !row) return db.tables[table.id] || [];
 
-        if (!db.tables[appId]) db.tables[appId] = {};
-        if (!db.tables[appId][tableId]) return [];
+        if (!db.tables[table.id]) return [];
 
-        const data = db.tables[appId][tableId];
+        const data = db.tables[table.id];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex !== -1) {
@@ -108,13 +100,13 @@ export default class FileConnector extends Connector {
         return data;
     }
 
-    async deleteRow(appId: string, tableId: string, key?: Record<string, unknown>) {
+    async deleteRow(table: AppTable, key?: Record<string, unknown>) {
         const db = await this._readDB();
-        if (!key) return db.tables[appId]?.[tableId] || [];
+        if (!key) return db.tables[table.id] || [];
 
-        if (!db.tables[appId] || !db.tables[appId][tableId]) return [];
+        if (!db.tables[table.id]) return [];
 
-        const data = db.tables[appId][tableId];
+        const data = db.tables[table.id];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex !== -1) {

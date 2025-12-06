@@ -564,8 +564,12 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
             const { appId, tableId } = request.params;
             const { query: queryStr } = request.query;
 
-            const { response, success, connector } = await handleTable(appId, tableId, reply);
-            if (!success) return response;
+            const { response, success, connector, table } = await handleTable(
+                appId,
+                tableId,
+                reply
+            );
+            if (!success || !table) return response;
 
             let query;
             if (queryStr) {
@@ -599,7 +603,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
             if (query) {
                 const capabilities = connector.getCapabilities
-                    ? await connector.getCapabilities(appId, tableId)
+                    ? await connector.getCapabilities(table)
                     : {};
 
                 if (query.filters?.length) {
@@ -657,7 +661,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                 }
             }
 
-            let data = await connector.getData!(appId, tableId, finalQuery);
+            let data = await connector.getData!(table, finalQuery);
             if (!qMissingCaps) return data;
 
             if (qMissingCaps.filters) {
@@ -758,13 +762,12 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                             }
 
                             await connector?.addRow?.(
-                                appId,
-                                tableId,
+                                table,
                                 rowResult.data as Record<string, unknown>
                             );
                         }
 
-                        return connector?.getData?.(appId, tableId) || [];
+                        return connector?.getData?.(table) || [];
                     }
                     case 'update': {
                         const validator = _zodFromTable(table!, appId, validatorCache);
@@ -780,24 +783,23 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                             if (Object.keys(key).length === 0) continue;
 
                             await connector?.updateRow?.(
-                                appId,
-                                tableId,
+                                table,
                                 key,
                                 rowResult.data as Record<string, unknown>
                             );
                         }
 
-                        return connector?.getData?.(appId, tableId) || [];
+                        return connector?.getData?.(table) || [];
                     }
                     case 'delete': {
                         for (const row of currentRows) {
                             const key = extractKeys(row, keyFields);
                             if (Object.keys(key).length === 0) continue;
 
-                            await connector?.deleteRow?.(appId, tableId, key);
+                            await connector?.deleteRow?.(table, key);
                         }
 
-                        return connector?.getData?.(appId, tableId) || [];
+                        return connector?.getData?.(table) || [];
                     }
                     case 'process': {
                         const subActions = (action.config?.actions as string[]) || [];
