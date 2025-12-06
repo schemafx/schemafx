@@ -20,11 +20,7 @@ export default class FileConnector extends Connector {
         const db = await this._readDB();
         const tables = new Set<string>();
 
-        for (const appId in db.tables) {
-            for (const tableId in db.tables[appId]) {
-                tables.add(tableId);
-            }
-        }
+        for (const tableId in db.tables) tables.add(tableId);
 
         return Array.from(tables).map(tableId => ({
             name: tableId,
