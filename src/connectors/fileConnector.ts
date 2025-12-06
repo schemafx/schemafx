@@ -15,6 +15,24 @@ export default class FileConnector extends Connector {
         this.filePath = filePath;
     }
 
+    async listTables(path: string[]) {
+        if (path.length > 0) return [];
+        const db = await this._readDB();
+        const tables = new Set<string>();
+
+        for (const appId in db.tables) {
+            for (const tableId in db.tables[appId]) {
+                tables.add(tableId);
+            }
+        }
+
+        return Array.from(tables).map(tableId => ({
+            name: tableId,
+            path: [tableId],
+            capabilities: ['Connect' as const]
+        }));
+    }
+
     async getCapabilities() {
         // In-Memory capabilities only.
         // Default capability handler.

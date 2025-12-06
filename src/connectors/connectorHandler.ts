@@ -15,7 +15,8 @@ import {
     AppActionSchema,
     type AppAction,
     TableQueryOptionsSchema,
-    type TableQueryOptions
+    type TableQueryOptions,
+    ConnectorTableSchema
 } from '../types.js';
 import z from 'zod';
 import { LRUCache } from 'lru-cache';
@@ -544,6 +545,49 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
             }
 
             return getSchema(request.params.appId);
+        }
+    );
+
+    fastify.post(
+        '/connectors/:connectorName/query',
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                params: z.object({ connectorName: z.string().min(1) }),
+                body: z.object({
+                    path: z.array(z.string())
+                }),
+                response: {
+                    200: z.array(ConnectorTableSchema),
+                    404: z.object({
+                        error: z.string(),
+                        message: z.string()
+                    }),
+                    400: z.object({
+                        error: z.string(),
+                        message: z.string()
+                    })
+                }
+            }
+        },
+        async (request, reply) => {
+            const connector = connectors[request.params.connectorName];
+
+            if (!connector) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Connector not found.'
+                });
+            }
+
+            if (!connector.listTables) {
+                return reply.code(400).send({
+                    error: 'Bad Request',
+                    message: 'Connector does not support table listing.'
+                });
+            }
+
+            return connector.listTables(request.body.path);
         }
     );
 

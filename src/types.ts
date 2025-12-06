@@ -79,6 +79,7 @@ export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     connector: z.string().min(1),
+    path: z.array(z.string()).default([]),
     fields: z.array(AppFieldSchema),
     actions: z.array(AppActionSchema).default([])
 });
@@ -132,6 +133,14 @@ export const TableQueryOptionsSchema = z.object({
 
 export type TableQueryOptions = z.infer<typeof TableQueryOptionsSchema>;
 
+export const ConnectorTableSchema = z.object({
+    name: z.string(),
+    path: z.array(z.string()),
+    capabilities: z.array(z.enum(['Unavailable', 'Connect', 'Explore', 'Create']))
+});
+
+export type ConnectorTable = z.infer<typeof ConnectorTableSchema>;
+
 export abstract class Connector {
     name: string;
     id: string;
@@ -140,6 +149,13 @@ export abstract class Connector {
         this.name = name;
         this.id = id ?? name;
     }
+
+    /**
+     * List available tables.
+     * @param path Path to retrieve from.
+     * @returns List of available tables.
+     */
+    listTables?(path: string[]): Promise<ConnectorTable[]>;
 
     /**
      * Get the capabilities of the connector.

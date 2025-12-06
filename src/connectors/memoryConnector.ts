@@ -5,6 +5,19 @@ export default class MemoryConnector extends Connector {
     schemas: Map<string, AppSchema> = new Map();
     tables: Map<string, AppTableRow[]> = new Map();
 
+    async listTables(path: string[]) {
+        if (path.length > 0) return [];
+        const tables = new Set<string>();
+
+        for (const [tableId] of this.tables) tables.add(tableId);
+
+        return Array.from(tables).map(tableId => ({
+            name: tableId,
+            path: [tableId],
+            capabilities: ['Connect' as const]
+        }));
+    }
+
     async getCapabilities() {
         // In-Memory capabilities only.
         // Default capability handler.
