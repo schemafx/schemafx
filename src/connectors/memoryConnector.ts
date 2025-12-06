@@ -56,7 +56,7 @@ export default class MemoryConnector extends Connector {
     }
 
     async getData(table: AppTable) {
-        return [...(this.tables.get(table.id) ?? [])];
+        return [...(this.tables.get(table.path[0]) ?? [])];
     }
 
     async addRow(table: AppTable, row?: AppTableRow) {
@@ -64,7 +64,7 @@ export default class MemoryConnector extends Connector {
         if (!row) return data;
 
         data.push(row);
-        this.tables.set(table.id, data);
+        this.tables.set(table.path[0], data);
 
         return data;
     }
@@ -79,7 +79,7 @@ export default class MemoryConnector extends Connector {
         if (rowIndex === -1) return data;
 
         data[rowIndex] = { ...data[rowIndex], ...row };
-        this.tables.set(table.id, data);
+        this.tables.set(table.path[0], data);
 
         return data;
     }
@@ -94,7 +94,7 @@ export default class MemoryConnector extends Connector {
         if (rowIndex === -1) return data;
 
         data.splice(rowIndex, 1);
-        this.tables.set(table.id, data);
+        this.tables.set(table.path[0], data);
 
         return data;
     }

@@ -5,6 +5,7 @@
         {
             "id": "customers",
             "name": "Customers",
+            "path": ["customers"],
             "connector": "memory",
             "fields": [
                 {
@@ -33,6 +34,7 @@
         {
             "id": "orders",
             "name": "Orders",
+            "path": ["orders"],
             "connector": "memory",
             "fields": [
                 {
