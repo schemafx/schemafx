@@ -10,8 +10,8 @@ const app = new SchemaFX({
     connectorOpts: {
         schemaConnector: 'file',
         connectors: {
-            memory: new MemoryConnector(),
-            file: new FileConnector(dbPath)
+            memory: new MemoryConnector('Memory', 'memory'),
+            file: new FileConnector('File System', dbPath, 'file')
         }
     }
 });

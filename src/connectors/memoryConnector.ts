@@ -1,9 +1,33 @@
 import mock_data from './mock_data.json' with { type: 'json' };
-import { Connector, type AppSchema, type AppTableRow } from '../types.js';
+import {
+    Connector,
+    type AppSchema,
+    type AppTableRow,
+    type AppTable,
+    inferTable
+} from '../types.js';
 
 export default class MemoryConnector extends Connector {
     schemas: Map<string, AppSchema> = new Map();
-    tables: Map<string, Map<string, AppTableRow[]>> = new Map();
+    tables: Map<string, AppTableRow[]> = new Map();
+
+    async listTables(path: string[]) {
+        if (path.length > 0) return [];
+        const tables = new Set<string>();
+
+        for (const [tableId] of this.tables) tables.add(tableId);
+
+        return Array.from(tables).map(tableId => ({
+            name: tableId,
+            path: [tableId],
+            capabilities: ['Connect' as const]
+        }));
+    }
+
+    async getTable(path: string[]) {
+        const tableId = path[0];
+        return inferTable(tableId, path, this.tables.get(tableId) || [], this.id);
+    }
 
     async getCapabilities() {
         // In-Memory capabilities only.
@@ -31,30 +55,22 @@ export default class MemoryConnector extends Connector {
         this.schemas.delete(appId);
     }
 
-    async getData(appId: string, tableId: string) {
-        if (!this.tables.has(appId)) this.tables.set(appId, new Map());
-        return [...(this.tables.get(appId)?.get(tableId) ?? [])];
+    async getData(table: AppTable) {
+        return [...(this.tables.get(table.id) ?? [])];
     }
 
-    async addRow(appId: string, tableId: string, row?: AppTableRow) {
-        const data = await this.getData(appId, tableId);
+    async addRow(table: AppTable, row?: AppTableRow) {
+        const data = await this.getData(table);
         if (!row) return data;
 
         data.push(row);
-
-        if (!this.tables.has(appId)) this.tables.set(appId, new Map());
-        this.tables.get(appId)?.set(tableId, data);
+        this.tables.set(table.id, data);
 
         return data;
     }
 
-    async updateRow(
-        appId: string,
-        tableId: string,
-        key?: Record<string, unknown>,
-        row?: AppTableRow
-    ) {
-        const data = await this.getData(appId, tableId);
+    async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
+        const data = await this.getData(table);
 
         if (!key || !row) return data;
 
@@ -63,15 +79,13 @@ export default class MemoryConnector extends Connector {
         if (rowIndex === -1) return data;
 
         data[rowIndex] = { ...data[rowIndex], ...row };
-
-        if (!this.tables.has(appId)) this.tables.set(appId, new Map());
-        this.tables.get(appId)?.set(tableId, data);
+        this.tables.set(table.id, data);
 
         return data;
     }
 
-    async deleteRow(appId: string, tableId: string, key?: Record<string, unknown>) {
-        const data = await this.getData(appId, tableId);
+    async deleteRow(table: AppTable, key?: Record<string, unknown>) {
+        const data = await this.getData(table);
 
         if (!key) return data;
 
@@ -80,9 +94,7 @@ export default class MemoryConnector extends Connector {
         if (rowIndex === -1) return data;
 
         data.splice(rowIndex, 1);
-
-        if (!this.tables.has(appId)) this.tables.set(appId, new Map());
-        this.tables.get(appId)?.set(tableId, data);
+        this.tables.set(table.id, data);
 
         return data;
     }

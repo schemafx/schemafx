@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 export const AppFieldTypeSchema = z.enum([
@@ -79,6 +80,7 @@ export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     connector: z.string().min(1),
+    path: z.array(z.string()).default([]),
     fields: z.array(AppFieldSchema),
     actions: z.array(AppActionSchema).default([])
 });
@@ -132,12 +134,36 @@ export const TableQueryOptionsSchema = z.object({
 
 export type TableQueryOptions = z.infer<typeof TableQueryOptionsSchema>;
 
+export const ConnectorTableSchema = z.object({
+    name: z.string(),
+    path: z.array(z.string()),
+    capabilities: z.array(z.enum(['Unavailable', 'Connect', 'Explore', 'Create']))
+});
+
+export type ConnectorTable = z.infer<typeof ConnectorTableSchema>;
+
 export abstract class Connector {
+    name: string;
+    id: string;
+
+    constructor(name: string, id?: string) {
+        this.name = name;
+        this.id = id ?? name;
+    }
+
+    /**
+     * List available tables.
+     * @param path Path to retrieve from.
+     * @returns List of available tables.
+     */
+    listTables?(path: string[]): Promise<ConnectorTable[]>;
+
     /**
      * Get the capabilities of the connector.
+     * @param table Table to get capabilities for.
      * @returns Connector Capabilities.
      */
-    getCapabilities?(appId: string, tableId: string): Promise<ConnectorCapabilities>;
+    getCapabilities?(table: AppTable): Promise<ConnectorCapabilities>;
 
     /**
      * Retrieve a Schema.
@@ -162,43 +188,105 @@ export abstract class Connector {
 
     /**
      * Get data from a Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param query Query Options.
      */
-    getData?(appId: string, tableId: string, query?: TableQueryOptions): Promise<AppTableRow[]>;
+    getData?(table: AppTable, query?: TableQueryOptions): Promise<AppTableRow[]>;
 
     /**
      * Add a new Row to the Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param row Table Row.
      */
-    addRow?(appId: string, tableId: string, row?: AppTableRow): Promise<AppTableRow[]>;
+    addRow?(table: AppTable, row?: AppTableRow): Promise<AppTableRow[]>;
 
     /**
      * Update a Row from the Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param key Key of the Row.
      * @param row Table Row.
      */
     updateRow?(
-        appId: string,
-        tableId: string,
+        table: AppTable,
         key?: Record<string, unknown>,
         row?: AppTableRow
     ): Promise<AppTableRow[]>;
 
     /**
      * Delete a Row from the Table.
-     * @param appId Id of the Application.
-     * @param tableId Id of the Table.
+     * @param table Table.
      * @param key Key of the Row.
      */
-    deleteRow?(
-        appId: string,
-        tableId: string,
-        key?: Record<string, unknown>
-    ): Promise<AppTableRow[]>;
+    deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<AppTableRow[]>;
+
+    /**
+     * Get a Table Schema from a path.
+     * @param path Path to the Table.
+     * @returns Table Schema.
+     */
+    getTable?(path: string[]): Promise<AppTable>;
+}
+
+/**
+ * Infer a Table Schema from data.
+ * @param name Name of the Table.
+ * @param path Path to the Table.
+ * @param data Data to infer from.
+ * @param connectorId Id of the Connector.
+ * @returns Inferred Table Schema.
+ */
+export function inferTable(
+    name: string,
+    path: string[],
+    data: AppTableRow[],
+    connectorId: string
+): AppTable {
+    const keys = new Set<string>();
+    for (const row of data) Object.keys(row).forEach(k => keys.add(k));
+
+    const fields: AppField[] = [];
+    let hasKey = false;
+    for (const key of keys) {
+        let detectedType: AppFieldType | null = null;
+
+        for (const row of data) {
+            const val = row[key];
+            if (val === null || val === undefined) continue;
+
+            let type: AppFieldType = 'text';
+            if (typeof val === 'number') type = 'number';
+            else if (typeof val === 'boolean') type = 'boolean';
+            else if (Array.isArray(val)) type = 'list';
+            else if (typeof val === 'object') type = 'json';
+
+            if (detectedType && detectedType !== type) {
+                detectedType = 'text';
+                break;
+            }
+
+            if (!detectedType) detectedType = type;
+        }
+
+        const isKey = key === 'id';
+        fields.push({
+            id: key,
+            name: key,
+            type: detectedType || 'text',
+            isRequired: false,
+            isKey
+        });
+
+        if (isKey) hasKey = true;
+    }
+
+    if (!hasKey && fields[0]) fields[0].isKey = true;
+
+    return {
+        id: randomUUID(),
+        name,
+        connector: connectorId,
+        path,
+        fields,
+        actions: []
+    };
 }
