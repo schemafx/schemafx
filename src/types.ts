@@ -133,6 +133,14 @@ export const TableQueryOptionsSchema = z.object({
 export type TableQueryOptions = z.infer<typeof TableQueryOptionsSchema>;
 
 export abstract class Connector {
+    name: string;
+    id: string;
+
+    constructor(name: string, id?: string) {
+        this.name = name;
+        this.id = id ?? name;
+    }
+
     /**
      * Get the capabilities of the connector.
      * @param table Table to get capabilities for.

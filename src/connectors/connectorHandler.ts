@@ -197,6 +197,28 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         return schema;
     }
 
+    const _connectors = Object.values(connectors).map(connector => ({
+        id: connector.id,
+        name: connector.name
+    }));
+
+    fastify.get(
+        '/connectors',
+        {
+            schema: {
+                response: {
+                    200: z.array(
+                        z.object({
+                            id: z.string(),
+                            name: z.string()
+                        })
+                    )
+                }
+            }
+        },
+        async () => _connectors
+    );
+
     fastify.post(
         '/login',
         {

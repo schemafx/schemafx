@@ -10,8 +10,8 @@ type FileDB = {
 export default class FileConnector extends Connector {
     filePath: string;
 
-    constructor(filePath: string) {
-        super();
+    constructor(name: string, filePath: string, id?: string) {
+        super(name, id);
         this.filePath = filePath;
     }
 
