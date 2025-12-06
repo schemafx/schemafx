@@ -529,26 +529,31 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         const schema = await getSchema(appId);
         const table = schema.tables.find(table => table.id === tableId);
 
-        let response;
         if (!table) {
-            response = reply.code(400).send({
-                error: 'Data Error',
-                message: 'Invalid table.'
-            });
-
-            return { schema, table, response };
+            return {
+                schema,
+                table,
+                response: reply.code(400).send({
+                    error: 'Data Error',
+                    message: 'Invalid table.'
+                })
+            };
         }
 
         const connectorName = table.connector;
         const connector = connectors[connectorName];
 
         if (!connector) {
-            response = reply.code(500).send({
-                error: 'Data Error',
-                message: 'Invalid connector.'
-            });
-
-            return { schema, table, connectorName, connector, response };
+            return {
+                schema,
+                table,
+                connectorName,
+                connector,
+                response: reply.code(500).send({
+                    error: 'Data Error',
+                    message: 'Invalid connector.'
+                })
+            };
         }
 
         return { schema, table, connectorName, connector, success: true };
