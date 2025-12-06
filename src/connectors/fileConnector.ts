@@ -1,5 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { Connector, type AppSchema, type AppTableRow, type AppTable } from '../types.js';
+import {
+    Connector,
+    type AppSchema,
+    type AppTableRow,
+    type AppTable,
+    inferTable
+} from '../types.js';
 import mock_data from './mock_data.json' with { type: 'json' };
 
 type FileDB = {
@@ -27,6 +33,13 @@ export default class FileConnector extends Connector {
             path: [tableId],
             capabilities: ['Connect' as const]
         }));
+    }
+
+    async getTable(path: string[]) {
+        const db = await this._readDB();
+        const tableId = path[0];
+        const data = db.tables[tableId] || [];
+        return inferTable(tableId, path, data, this.id);
     }
 
     async getCapabilities() {

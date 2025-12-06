@@ -1,5 +1,11 @@
 import mock_data from './mock_data.json' with { type: 'json' };
-import { Connector, type AppSchema, type AppTableRow, type AppTable } from '../types.js';
+import {
+    Connector,
+    type AppSchema,
+    type AppTableRow,
+    type AppTable,
+    inferTable
+} from '../types.js';
 
 export default class MemoryConnector extends Connector {
     schemas: Map<string, AppSchema> = new Map();
@@ -16,6 +22,12 @@ export default class MemoryConnector extends Connector {
             path: [tableId],
             capabilities: ['Connect' as const]
         }));
+    }
+
+    async getTable(path: string[]) {
+        const tableId = path[0];
+        const data = this.tables.get(tableId) || [];
+        return inferTable(tableId, path, data, this.id);
     }
 
     async getCapabilities() {

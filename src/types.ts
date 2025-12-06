@@ -217,4 +217,69 @@ export abstract class Connector {
      * @param key Key of the Row.
      */
     deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<AppTableRow[]>;
+
+    /**
+     * Get a Table Schema from a path.
+     * @param path Path to the Table.
+     * @returns Table Schema.
+     */
+    getTable?(path: string[]): Promise<AppTable>;
+}
+
+/**
+ * Infer a Table Schema from data.
+ * @param name Name of the Table.
+ * @param path Path to the Table.
+ * @param data Data to infer from.
+ * @param connectorId Id of the Connector.
+ * @returns Inferred Table Schema.
+ */
+export function inferTable(
+    name: string,
+    path: string[],
+    data: AppTableRow[],
+    connectorId: string
+): AppTable {
+    const keys = new Set<string>();
+    for (const row of data) Object.keys(row).forEach(k => keys.add(k));
+
+    const fields: AppField[] = [];
+    for (const key of keys) {
+        let detectedType: AppFieldType | null = null;
+
+        for (const row of data) {
+            const val = row[key];
+            if (val === null || val === undefined) continue;
+
+            let type: AppFieldType = 'text';
+            if (typeof val === 'number') type = 'number';
+            else if (typeof val === 'boolean') type = 'boolean';
+            else if (Array.isArray(val)) type = 'list';
+            else if (typeof val === 'object') type = 'json';
+
+            if (detectedType && detectedType !== type) {
+                detectedType = 'text';
+                break;
+            }
+
+            if (!detectedType) detectedType = type;
+        }
+
+        fields.push({
+            id: key,
+            name: key,
+            type: detectedType || 'text',
+            isRequired: false,
+            isKey: key === 'id'
+        });
+    }
+
+    return {
+        id: name,
+        name,
+        connector: connectorId,
+        path,
+        fields,
+        actions: []
+    };
 }
