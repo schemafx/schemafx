@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 export const AppFieldTypeSchema = z.enum([
@@ -244,6 +245,7 @@ export function inferTable(
     for (const row of data) Object.keys(row).forEach(k => keys.add(k));
 
     const fields: AppField[] = [];
+    let hasKey = false;
     for (const key of keys) {
         let detectedType: AppFieldType | null = null;
 
@@ -265,17 +267,22 @@ export function inferTable(
             if (!detectedType) detectedType = type;
         }
 
+        const isKey = key === 'id';
         fields.push({
             id: key,
             name: key,
             type: detectedType || 'text',
             isRequired: false,
-            isKey: key === 'id'
+            isKey
         });
+
+        if (isKey) hasKey = true;
     }
 
+    if (!hasKey && fields[0]) fields[0].isKey = true;
+
     return {
-        id: name,
+        id: randomUUID(),
         name,
         connector: connectorId,
         path,

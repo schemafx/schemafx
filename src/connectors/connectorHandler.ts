@@ -20,6 +20,7 @@ import {
 } from '../types.js';
 import z from 'zod';
 import { LRUCache } from 'lru-cache';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Generate a Zod schema for a single AppField.
@@ -588,6 +589,76 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
             }
 
             return connector.listTables(request.body.path);
+        }
+    );
+
+    fastify.post(
+        '/connectors/:connectorName/table',
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                params: z.object({ connectorName: z.string().min(1) }),
+                body: z.object({
+                    path: z.array(z.string()),
+                    appId: z.string().min(1).optional()
+                }),
+                response: {
+                    200: AppSchemaSchema,
+                    404: z.object({
+                        error: z.string(),
+                        message: z.string()
+                    }),
+                    400: z.object({
+                        error: z.string(),
+                        message: z.string()
+                    })
+                }
+            }
+        },
+        async (request, reply) => {
+            const connector = connectors[request.params.connectorName];
+
+            if (!connector) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Connector not found.'
+                });
+            }
+
+            if (!connector.getTable) {
+                return reply.code(400).send({
+                    error: 'Bad Request',
+                    message: 'Connector does not support getting table.'
+                });
+            }
+
+            const { path, appId } = request.body;
+            const table = await connector.getTable(path);
+            _validateTableKeys(table);
+
+            let schema: AppSchema;
+            if (appId) {
+                schema = await getSchema(appId);
+
+                if (!schema) {
+                    return reply.code(404).send({
+                        error: 'Not Found',
+                        message: 'Application not found.'
+                    });
+                }
+
+                schema.tables.push(table);
+            } else {
+                schema = {
+                    id: randomUUID(),
+                    name: 'New App',
+                    tables: [table],
+                    views: []
+                };
+            }
+
+            schemaCache.delete(schema.id);
+            return sConnector.saveSchema!(schema.id, schema);
         }
     );
 

@@ -26,8 +26,7 @@ export default class MemoryConnector extends Connector {
 
     async getTable(path: string[]) {
         const tableId = path[0];
-        const data = this.tables.get(tableId) || [];
-        return inferTable(tableId, path, data, this.id);
+        return inferTable(tableId, path, this.tables.get(tableId) || [], this.id);
     }
 
     async getCapabilities() {

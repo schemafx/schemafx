@@ -38,8 +38,8 @@ export default class FileConnector extends Connector {
     async getTable(path: string[]) {
         const db = await this._readDB();
         const tableId = path[0];
-        const data = db.tables[tableId] || [];
-        return inferTable(tableId, path, data, this.id);
+
+        return inferTable(tableId, path, db.tables[tableId] || [], this.id);
     }
 
     async getCapabilities() {
