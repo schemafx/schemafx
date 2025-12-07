@@ -4,7 +4,8 @@ import {
     type AppSchema,
     type AppTableRow,
     type AppTable,
-    inferTable
+    inferTable,
+    ConnectorTableCapability
 } from '../types.js';
 import mock_data from './mock_data.json' with { type: 'json' };
 
@@ -31,7 +32,7 @@ export default class FileConnector extends Connector {
         return Array.from(tables).map(tableId => ({
             name: tableId,
             path: [tableId],
-            capabilities: ['Connect' as const]
+            capabilities: [ConnectorTableCapability.Connect]
         }));
     }
 

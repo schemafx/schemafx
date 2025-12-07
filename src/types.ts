@@ -1,19 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
-export const AppFieldTypeSchema = z.enum([
-    'text',
-    'number',
-    'date',
-    'email',
-    'dropdown',
-    'boolean',
-    'reference',
-    'json',
-    'list'
-]);
-
-export type AppFieldType = z.infer<typeof AppFieldTypeSchema>;
+export enum AppFieldType {
+    Text = 'text',
+    Number = 'number',
+    Date = 'date',
+    Email = 'email',
+    Dropdown = 'dropdown',
+    Boolean = 'boolean',
+    Reference = 'reference',
+    JSON = 'json',
+    List = 'list'
+}
 
 export type AppField = {
     id: string;
@@ -37,7 +35,7 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
     z.object({
         id: z.string(),
         name: z.string().min(1),
-        type: AppFieldTypeSchema,
+        type: z.enum(Object.values(AppFieldType)),
         isRequired: z.boolean().default(false),
         isKey: z.boolean().default(false),
 
@@ -67,10 +65,17 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
     })
 );
 
+export enum AppActionType {
+    Add = 'add',
+    Update = 'update',
+    Delete = 'delete',
+    Process = 'process'
+}
+
 export const AppActionSchema = z.object({
     id: z.string(),
     name: z.string(),
-    type: z.enum(['add', 'update', 'delete', 'process']),
+    type: z.enum(Object.values(AppActionType)),
     config: z.looseObject({}).default({})
 });
 
@@ -91,15 +96,16 @@ export const AppTableRowSchema = z.looseObject({});
 
 export type AppTableRow = z.infer<typeof AppTableRowSchema>;
 
-export const AppViewTypeSchema = z.enum(['table', 'form']);
-
-export type AppViewType = z.infer<typeof AppViewTypeSchema>;
+export enum AppViewType {
+    Table = 'table',
+    Form = 'form'
+}
 
 export const AppViewSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     tableId: z.string(),
-    type: AppViewTypeSchema,
+    type: z.enum(Object.values(AppViewType)),
     config: z.looseObject({}).default({})
 });
 
@@ -114,9 +120,19 @@ export const AppSchemaSchema = z.object({
 
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
 
+export enum QueryFilterOperator {
+    Equals = 'eq',
+    NotEqual = 'ne',
+    GreaterThan = 'gt',
+    GreaterThanOrEqualTo = 'gte',
+    LowerThan = 'lt',
+    LowerThanOrEqualTo = 'lte',
+    Contains = 'contains'
+}
+
 export const QueryFilterSchema = z.object({
     field: z.string(),
-    operator: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains']),
+    operator: z.enum(Object.values(QueryFilterOperator)),
     value: z.any()
 });
 
@@ -134,10 +150,16 @@ export const TableQueryOptionsSchema = z.object({
 
 export type TableQueryOptions = z.infer<typeof TableQueryOptionsSchema>;
 
+export enum ConnectorTableCapability {
+    Unavailable = 'Unavailable',
+    Connect = 'Connect',
+    Explore = 'Explore'
+}
+
 export const ConnectorTableSchema = z.object({
     name: z.string(),
     path: z.array(z.string()),
-    capabilities: z.array(z.enum(['Unavailable', 'Connect', 'Explore', 'Create']))
+    capabilities: z.array(z.enum(Object.values(ConnectorTableCapability)))
 });
 
 export type ConnectorTable = z.infer<typeof ConnectorTableSchema>;
@@ -253,14 +275,14 @@ export function inferTable(
             const val = row[key];
             if (val === null || val === undefined) continue;
 
-            let type: AppFieldType = 'text';
-            if (typeof val === 'number') type = 'number';
-            else if (typeof val === 'boolean') type = 'boolean';
-            else if (Array.isArray(val)) type = 'list';
-            else if (typeof val === 'object') type = 'json';
+            let type = AppFieldType.Text;
+            if (typeof val === 'number') type = AppFieldType.Number;
+            else if (typeof val === 'boolean') type = AppFieldType.Boolean;
+            else if (Array.isArray(val)) type = AppFieldType.List;
+            else if (typeof val === 'object') type = AppFieldType.JSON;
 
             if (detectedType && detectedType !== type) {
-                detectedType = 'text';
+                detectedType = AppFieldType.Text;
                 break;
             }
 
@@ -271,7 +293,7 @@ export function inferTable(
         fields.push({
             id: key,
             name: key,
-            type: detectedType || 'text',
+            type: detectedType || AppFieldType.Text,
             isRequired: false,
             isKey
         });

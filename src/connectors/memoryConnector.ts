@@ -4,7 +4,8 @@ import {
     type AppSchema,
     type AppTableRow,
     type AppTable,
-    inferTable
+    inferTable,
+    ConnectorTableCapability
 } from '../types.js';
 
 export default class MemoryConnector extends Connector {
@@ -20,7 +21,7 @@ export default class MemoryConnector extends Connector {
         return Array.from(tables).map(tableId => ({
             name: tableId,
             path: [tableId],
-            capabilities: ['Connect' as const]
+            capabilities: [ConnectorTableCapability.Connect]
         }));
     }
 

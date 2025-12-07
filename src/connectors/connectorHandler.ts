@@ -16,7 +16,10 @@ import {
     type AppAction,
     TableQueryOptionsSchema,
     type TableQueryOptions,
-    ConnectorTableSchema
+    ConnectorTableSchema,
+    QueryFilterOperator,
+    AppFieldType,
+    AppActionType
 } from '../types.js';
 import z from 'zod';
 import { LRUCache } from 'lru-cache';
@@ -31,29 +34,29 @@ function _zodFromField(field: AppField): z.ZodTypeAny {
     let fld;
 
     switch (field.type) {
-        case 'number':
+        case AppFieldType.Number:
             fld = z.number();
             if (typeof field.minValue === 'number') fld = fld.min(field.minValue);
             if (typeof field.maxValue === 'number') fld = fld.max(field.maxValue);
             break;
-        case 'boolean':
+        case AppFieldType.Boolean:
             fld = z.boolean();
             break;
-        case 'date':
+        case AppFieldType.Date:
             fld = z.date();
             if (field.startDate) fld = fld.min(field.startDate);
             if (field.endDate) fld = fld.max(field.endDate);
             break;
-        case 'email':
+        case AppFieldType.Email:
             fld = z.email();
             break;
-        case 'dropdown':
+        case AppFieldType.Dropdown:
             fld = z.enum((field.options as [string, ...string[]]) ?? []);
             break;
-        case 'json':
+        case AppFieldType.JSON:
             fld = _zodFromFields(field.fields ?? []);
             break;
-        case 'list':
+        case AppFieldType.List:
             if (field.child) {
                 fld = z.array(_zodFromField(field.child));
             } else {
@@ -811,19 +814,19 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                     qMissingCaps.filters!.every(filter => {
                         const rowValue = row[filter.field] as unknown;
                         switch (filter.operator) {
-                            case 'eq':
+                            case QueryFilterOperator.Equals:
                                 return rowValue === filter.value;
-                            case 'ne':
+                            case QueryFilterOperator.NotEqual:
                                 return rowValue !== filter.value;
-                            case 'gt':
+                            case QueryFilterOperator.GreaterThan:
                                 return (rowValue as number) > filter.value;
-                            case 'gte':
+                            case QueryFilterOperator.GreaterThanOrEqualTo:
                                 return (rowValue as number) >= filter.value;
-                            case 'lt':
+                            case QueryFilterOperator.LowerThan:
                                 return (rowValue as number) < filter.value;
-                            case 'lte':
+                            case QueryFilterOperator.LowerThanOrEqualTo:
                                 return (rowValue as number) <= filter.value;
-                            case 'contains':
+                            case QueryFilterOperator.Contains:
                                 return String(rowValue).includes(String(filter.value));
                             default:
                                 return true;
@@ -893,7 +896,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
                 }
 
                 switch (action.type) {
-                    case 'add': {
+                    case AppActionType.Add: {
                         const validator = _zodFromTable(table!, appId, validatorCache);
                         for (const row of currentRows) {
                             const rowResult = validator.safeParse(row);
@@ -911,7 +914,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                         return connector?.getData?.(table) || [];
                     }
-                    case 'update': {
+                    case AppActionType.Update: {
                         const validator = _zodFromTable(table!, appId, validatorCache);
                         for (const row of currentRows) {
                             const rowResult = validator.safeParse(row);
@@ -933,7 +936,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                         return connector?.getData?.(table) || [];
                     }
-                    case 'delete': {
+                    case AppActionType.Delete: {
                         for (const row of currentRows) {
                             const key = extractKeys(row, keyFields);
                             if (Object.keys(key).length === 0) continue;
@@ -943,7 +946,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
 
                         return connector?.getData?.(table) || [];
                     }
-                    case 'process': {
+                    case AppActionType.Process: {
                         const subActions = (action.config?.actions as string[]) || [];
                         let lastResult;
 

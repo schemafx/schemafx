@@ -7,15 +7,21 @@ export type { SchemaFXOptions } from './core.js';
 
 // Types
 export {
-    type AppFieldType,
+    type AppAction,
+    AppActionType,
+    AppFieldType,
     type AppField,
     type AppTable,
     type AppTableRow,
-    type AppViewType,
     type AppView,
+    AppViewType,
     type AppSchema,
     Connector,
     type ConnectorCapabilities,
+    type ConnectorTable,
+    ConnectorTableCapability,
+    inferTable,
+    QueryFilterOperator,
     type TableQueryOptions
 } from './types.js';
 
