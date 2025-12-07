@@ -42,6 +42,23 @@ describe('Core SchemaFX', () => {
         await app.fastifyInstance.close();
     });
 
+    it('should access the logger via the getter', () => {
+        const app = new SchemaFX({
+            jwtOpts: { secret: 'secret' },
+            connectorOpts: {
+                schemaConnector: 'mem',
+                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+            }
+        });
+
+        expect(app.log).toBeDefined();
+        expect(app.log).toBe(app.fastifyInstance.log);
+
+        expect(typeof app.log.info).toBe('function');
+        expect(typeof app.log.error).toBe('function');
+        expect(typeof app.log.debug).toBe('function');
+    });
+
     it('should handle listen', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
