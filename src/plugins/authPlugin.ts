@@ -1,5 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { ErrorResponseSchema } from '../utils/schemaUtils.js';
 
 const plugin: FastifyPluginAsyncZod = async fastify => {
     fastify.post(
@@ -7,17 +8,14 @@ const plugin: FastifyPluginAsyncZod = async fastify => {
         {
             schema: {
                 body: z.object({
-                    username: z.string().min(1),
-                    password: z.string().min(1)
+                    username: z.string().min(1).meta({ description: 'Username' }),
+                    password: z.string().min(1).meta({ description: 'Password' })
                 }),
                 response: {
                     200: z.object({
-                        token: z.string()
+                        token: z.string().meta({ description: 'JWT Token' })
                     }),
-                    401: z.object({
-                        error: z.string(),
-                        message: z.string()
-                    })
+                    401: ErrorResponseSchema
                 }
             }
         },

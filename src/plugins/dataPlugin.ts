@@ -8,7 +8,7 @@ import {
     type TableQueryOptions,
     QueryFilterOperator,
     AppActionType,
-    Connector
+    type Connector
 } from '../types.js';
 import { zodFromTable, extractKeys, tableQuerySchema } from '../utils/schemaUtils.js';
 import { LRUCache } from 'lru-cache';
@@ -188,11 +188,17 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
         {
             onRequest: [fastify.authenticate],
             schema: {
-                body: z.object({
-                    actionId: z.string().min(1),
-                    rows: z.array(AppTableRowSchema).optional().default([]),
-                    payload: z.any().optional()
-                }),
+                body: z
+                    .object({
+                        actionId: z.string().min(1).meta({ description: 'Action ID' }),
+                        rows: z
+                            .array(AppTableRowSchema)
+                            .optional()
+                            .default([])
+                            .meta({ description: 'Rows to perform action on' }),
+                        payload: z.any().optional().meta({ description: 'Action payload' })
+                    })
+                    .meta({ description: 'Action execution request' }),
                 ...tableQuerySchema
             }
         },

@@ -8,6 +8,7 @@ import fastify, {
 } from 'fastify';
 
 import {
+    jsonSchemaTransform,
     serializerCompiler,
     validatorCompiler,
     type ZodTypeProvider
@@ -19,6 +20,8 @@ import fastifyHealthcheck, { type FastifyHealthcheckOptions } from 'fastify-heal
 import fastifyHelmet, { type FastifyHelmetOptions } from '@fastify/helmet';
 import fastifyJwt, { type FastifyJWTOptions } from '@fastify/jwt';
 import fastifyCompress, { type FastifyCompressOptions } from '@fastify/compress';
+import fastifySwagger, { type SwaggerOptions } from '@fastify/swagger';
+import fastifySwaggerUi, { type FastifySwaggerUiOptions } from '@fastify/swagger-ui';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import connectorHandler, { type SchemaFXConnectorsOptions } from './plugins/index.js';
@@ -31,6 +34,8 @@ export type SchemaFXOptions = {
     rateLimitOpts?: FastifyRateLimitOptions;
     healthcheckOpts?: FastifyHealthcheckOptions;
     compressOpts?: FastifyCompressOptions;
+    swaggerOpts?: SwaggerOptions;
+    swaggerUiOpts?: FastifySwaggerUiOptions;
     jwtOpts: FastifyJWTOptions;
     connectorOpts: SchemaFXConnectorsOptions;
 };
@@ -121,6 +126,29 @@ export default class SchemaFX {
                 message: 'Unexpected error occurred.'
             });
         });
+
+        this.fastifyInstance.register(fastifySwagger, {
+            openapi: {
+                info: {
+                    title: 'SchemaFX',
+                    description: 'Build Without Boundaries',
+                    version: '0.0.0'
+                },
+                servers: []
+            },
+            transform: jsonSchemaTransform,
+            ...(opts.swaggerOpts ?? {})
+        } as SwaggerOptions);
+
+        this.fastifyInstance.register(fastifySwaggerUi, {
+            routePrefix: '/api/docs',
+            ...(opts.swaggerUiOpts ?? {})
+        });
+
+        this.fastifyInstance.get('/api/openapi.json', () => this.fastifyInstance.swagger());
+        this.fastifyInstance.get('/api/openapi.yaml', () =>
+            this.fastifyInstance.swagger({ yaml: true })
+        );
 
         this.fastifyInstance.register(connectorHandler, {
             prefix: '/api',

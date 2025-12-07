@@ -3,6 +3,16 @@ import { LRUCache } from 'lru-cache';
 import { type AppField, AppFieldType, type AppTable, type AppTableRow } from '../types.js';
 
 /**
+ * Standard error response schema.
+ */
+export const ErrorResponseSchema = z
+    .object({
+        error: z.string().meta({ description: 'Error type or code' }),
+        message: z.string().meta({ description: 'Error message' })
+    })
+    .meta({ description: 'Default Error' });
+
+/**
  * Generate a Zod schema for a single AppField.
  * @param field Field to generate the validator from.
  * @returns Zod schema for the field.
@@ -110,30 +120,26 @@ export function extractKeys(
 /** Fastify Schema for table queries. */
 export const tableQuerySchema = {
     params: z.object({
-        appId: z.string().min(1),
-        tableId: z.string().min(1)
+        appId: z.string().min(1).meta({ description: 'Application ID' }),
+        tableId: z.string().min(1).meta({ description: 'Table ID' })
     }),
     querystring: z.object({
-        query: z.string().optional()
+        query: z.string().optional().meta({ description: 'JSON stringified query options' })
     }),
     response: {
-        200: z.any(),
-        500: z.object({
-            error: z.string(),
-            message: z.string()
-        }),
-        400: z.object({
-            error: z.string(),
-            message: z.string(),
+        200: z.any().meta({ description: 'Query results' }),
+        500: ErrorResponseSchema,
+        400: ErrorResponseSchema.extend({
             details: z
                 .array(
                     z.object({
-                        field: z.string(),
-                        message: z.string(),
-                        code: z.string()
+                        field: z.string().meta({ description: 'Field name' }),
+                        message: z.string().meta({ description: 'Error message' }),
+                        code: z.string().meta({ description: 'Error code' })
                     })
                 )
                 .optional()
-        })
+                .meta({ description: 'Validation error details' })
+        }).meta({ description: 'Validation error' })
     }
 };
