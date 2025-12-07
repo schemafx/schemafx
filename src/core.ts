@@ -3,7 +3,8 @@ import fastify, {
     type FastifyBaseLogger,
     type FastifyInstance,
     type FastifyServerOptions,
-    type RawServerDefault
+    type RawServerDefault,
+    type FastifyError
 } from 'fastify';
 
 import {
