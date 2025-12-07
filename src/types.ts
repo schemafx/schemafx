@@ -75,7 +75,7 @@ export const AppActionSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(Object.values(AppActionType)),
-    config: z.looseObject({}).default({})
+    config: z.looseObject({}).default({}).optional()
 });
 
 export type AppAction = z.infer<typeof AppActionSchema>;
