@@ -71,13 +71,6 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                 });
             }
 
-            if (!connector.listTables) {
-                return reply.code(400).send({
-                    error: 'Bad Request',
-                    message: 'Connector does not support table listing.'
-                });
-            }
-
             return connector.listTables(request.body.path);
         }
     );
@@ -112,13 +105,6 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                 return reply.code(404).send({
                     error: 'Not Found',
                     message: 'Connector not found.'
-                });
-            }
-
-            if (!connector.getTable) {
-                return reply.code(400).send({
-                    error: 'Bad Request',
-                    message: 'Connector does not support getting table.'
                 });
             }
 
