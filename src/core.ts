@@ -117,7 +117,7 @@ export default class SchemaFX {
 
             reply.log.error(error);
             return reply.status(500).send({
-                code: 'Internal Server Error',
+                error: 'Internal Server Error',
                 message: 'Unexpected error occurred.'
             });
         });

@@ -92,4 +92,64 @@ describe('Core SchemaFX', () => {
 
         await app.fastifyInstance.close();
     });
+
+    it('should handle SyntaxError (manually thrown)', async () => {
+        const app = new SchemaFX({
+            jwtOpts: { secret: 'secret' },
+            connectorOpts: {
+                schemaConnector: 'mem',
+                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+            }
+        });
+
+        const server = app.fastifyInstance;
+
+        server.get('/syntax-error', async () => {
+            throw new SyntaxError('Manual syntax error');
+        });
+
+        await server.ready();
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/syntax-error'
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Bad Request');
+        expect(body.message).toBe('Manual syntax error');
+
+        await server.close();
+    });
+
+    it('should handle unexpected errors', async () => {
+        const app = new SchemaFX({
+            jwtOpts: { secret: 'secret' },
+            connectorOpts: {
+                schemaConnector: 'mem',
+                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+            }
+        });
+
+        const server = app.fastifyInstance;
+
+        server.get('/error', async () => {
+            throw new Error('Unexpected Boom');
+        });
+
+        await server.ready();
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/error'
+        });
+
+        expect(response.statusCode).toBe(500);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Internal Server Error');
+        expect(body.message).toBe('Unexpected error occurred.');
+
+        await server.close();
+    });
 });
