@@ -18,8 +18,9 @@
         "dev": "tsx watch src/dev.ts",
         "prepare": "npm run build",
         "lint": "eslint",
-        "test": "vitest run",
+        "test": "npm run test:types && npm run test:unit",
         "test:watch": "vitest",
+        "test:unit": "vitest run",
         "test:coverage": "vitest run --coverage",
         "test:types": "tsc --noEmit"
     },
