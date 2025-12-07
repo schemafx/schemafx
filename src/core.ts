@@ -20,7 +20,7 @@ import fastifyJwt, { type FastifyJWTOptions } from '@fastify/jwt';
 import fastifyCompress, { type FastifyCompressOptions } from '@fastify/compress';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import connectorHandler, { type SchemaFXConnectorsOptions } from './connectors/connectorHandler.js';
+import connectorHandler, { type SchemaFXConnectorsOptions } from './plugins/index.js';
 
 export type SchemaFXOptions = {
     fastifyOpts?: FastifyServerOptions;

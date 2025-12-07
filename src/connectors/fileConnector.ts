@@ -4,9 +4,9 @@ import {
     type AppSchema,
     type AppTableRow,
     type AppTable,
-    inferTable,
     ConnectorTableCapability
 } from '../types.js';
+import inferTable from '../utils/inferTable.js';
 import mock_data from './mock_data.json' with { type: 'json' };
 
 type FileDB = {

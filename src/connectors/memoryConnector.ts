@@ -4,9 +4,9 @@ import {
     type AppSchema,
     type AppTableRow,
     type AppTable,
-    inferTable,
     ConnectorTableCapability
 } from '../types.js';
+import inferTable from '../utils/inferTable.js';
 
 export default class MemoryConnector extends Connector {
     schemas: Map<string, AppSchema> = new Map();

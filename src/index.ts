@@ -20,10 +20,11 @@ export {
     type ConnectorCapabilities,
     type ConnectorTable,
     ConnectorTableCapability,
-    inferTable,
     QueryFilterOperator,
     type TableQueryOptions
 } from './types.js';
+
+export { default as inferTable } from './utils/inferTable.js';
 
 // Connectors
 export { default as MemoryConnector } from './connectors/memoryConnector.js';
