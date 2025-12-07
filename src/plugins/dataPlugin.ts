@@ -80,29 +80,9 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
 
             let query;
             if (queryStr) {
-                try {
-                    query = JSON.parse(queryStr);
-                    const parsed = TableQueryOptionsSchema.safeParse(query);
-                    if (!parsed.success) {
-                        return reply.code(400).send({
-                            error: 'Validation Error',
-                            message: 'Invalid query parameters.',
-                            details: parsed.error.issues.map(issue => ({
-                                field: issue.path.join('.'),
-                                message: issue.message,
-                                code: issue.code
-                            }))
-                        });
-                    }
-
-                    query = parsed.data;
-                } catch (err: unknown) {
-                    reply.log.error(err);
-                    return reply.code(400).send({
-                        error: 'Validation Error',
-                        message: 'Invalid JSON in query parameter.'
-                    });
-                }
+                query = JSON.parse(queryStr);
+                const parsed = await TableQueryOptionsSchema.parseAsync(query);
+                query = parsed;
             }
 
             let finalQuery: TableQueryOptions | undefined;
@@ -246,17 +226,8 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                     case AppActionType.Add: {
                         const validator = zodFromTable(table!, appId, validatorCache);
                         for (const row of currentRows) {
-                            const rowResult = validator.safeParse(row);
-                            if (!rowResult.success) {
-                                throw new Error(
-                                    `Validation Error: ${JSON.stringify(rowResult.error.issues)}`
-                                );
-                            }
-
-                            await connector?.addRow?.(
-                                table,
-                                rowResult.data as Record<string, unknown>
-                            );
+                            const rowResult = await validator.parseAsync(row);
+                            await connector?.addRow?.(table, rowResult as Record<string, unknown>);
                         }
 
                         return connector?.getData?.(table) || [];
@@ -264,20 +235,14 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                     case AppActionType.Update: {
                         const validator = zodFromTable(table!, appId, validatorCache);
                         for (const row of currentRows) {
-                            const rowResult = validator.safeParse(row);
-                            if (!rowResult.success) {
-                                throw new Error(
-                                    `Validation Error: ${JSON.stringify(rowResult.error.issues)}`
-                                );
-                            }
-
+                            const rowData = await validator.parseAsync(row);
                             const key = extractKeys(row, keyFields);
                             if (Object.keys(key).length === 0) continue;
 
                             await connector?.updateRow?.(
                                 table,
                                 key,
-                                rowResult.data as Record<string, unknown>
+                                rowData as Record<string, unknown>
                             );
                         }
 
@@ -308,14 +273,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                 }
             }
 
-            try {
-                return executeAction(actionId, rows, 0);
-            } catch (error: unknown) {
-                return reply.code(400).send({
-                    error: 'Action Error',
-                    message: (error as Error).message
-                });
-            }
+            return executeAction(actionId, rows, 0);
         }
     );
 };

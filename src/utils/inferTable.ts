@@ -30,6 +30,7 @@ export default function inferTable(
             let type = AppFieldType.Text;
             if (typeof val === 'number') type = AppFieldType.Number;
             else if (typeof val === 'boolean') type = AppFieldType.Boolean;
+            else if (val instanceof Date) type = AppFieldType.Date;
             else if (Array.isArray(val)) type = AppFieldType.List;
             else if (typeof val === 'object') type = AppFieldType.JSON;
 

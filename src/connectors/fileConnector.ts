@@ -60,6 +60,7 @@ export default class FileConnector extends Connector {
                     tables: {}
                 };
             }
+
             throw error;
         }
     }

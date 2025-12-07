@@ -100,216 +100,204 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                     200: AppSchemaSchema,
                     400: z.object({
                         error: z.string(),
-                        message: z.string()
+                        message: z.string(),
+                        details: z.any().optional()
                     })
                 }
             }
         },
-        async (request, reply) => {
+        async request => {
             const { appId } = request.params;
             const schema = await getSchema(appId);
 
-            try {
-                switch (request.body.action) {
-                    case 'add':
-                        const addEl = request.body.element;
+            switch (request.body.action) {
+                case 'add':
+                    const addEl = request.body.element;
 
-                        if (addEl.partOf === 'tables') {
-                            validateTableKeys(addEl.element as AppTable);
-                            schema.tables.push(addEl.element as AppTable);
-                        } else if (addEl.partOf === 'views') {
-                            schema.views.push(addEl.element as AppView);
-                        } else if (addEl.partOf === 'fields' && addEl.parentId) {
-                            const oldFieldsLength =
-                                schema.tables.find(table => table.id === addEl.parentId)?.fields
-                                    ?.length ?? 0;
+                    if (addEl.partOf === 'tables') {
+                        validateTableKeys(addEl.element as AppTable);
+                        schema.tables.push(addEl.element as AppTable);
+                    } else if (addEl.partOf === 'views') {
+                        schema.views.push(addEl.element as AppView);
+                    } else if (addEl.partOf === 'fields' && addEl.parentId) {
+                        const oldFieldsLength =
+                            schema.tables.find(table => table.id === addEl.parentId)?.fields
+                                ?.length ?? 0;
 
-                            schema.views = schema.views.map(view => {
-                                if (
-                                    view.tableId === addEl.parentId &&
-                                    view.config.fields &&
-                                    (view.config.fields as string[]).length === oldFieldsLength
-                                ) {
-                                    (view.config.fields as string[]).push(
-                                        (addEl.element as AppField).id
+                        schema.views = schema.views.map(view => {
+                            if (
+                                view.tableId === addEl.parentId &&
+                                view.config.fields &&
+                                (view.config.fields as string[]).length === oldFieldsLength
+                            ) {
+                                (view.config.fields as string[]).push(
+                                    (addEl.element as AppField).id
+                                );
+                            }
+
+                            return view;
+                        });
+
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === addEl.parentId) {
+                                table.fields.push(addEl.element as AppField);
+                                validatorCache.delete(`${appId}:${table.id}`);
+                            }
+
+                            return table;
+                        });
+                    } else if (addEl.partOf === 'actions' && addEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === addEl.parentId) {
+                                table.actions.push(addEl.element as AppAction);
+                            }
+
+                            return table;
+                        });
+                    }
+
+                    schemaCache.delete(appId);
+                    return sConnector.saveSchema!(appId, schema);
+                case 'update':
+                    const updateEl = request.body.element;
+
+                    if (updateEl.partOf === 'tables') {
+                        validateTableKeys(updateEl.element as AppTable);
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === updateEl.element.id) {
+                                validatorCache.delete(`${appId}:${table.id}`);
+                                return updateEl.element as AppTable;
+                            }
+
+                            return table;
+                        });
+                    } else if (updateEl.partOf === 'views') {
+                        schema.views = schema.views.map(view =>
+                            view.id === updateEl.element.id ? (updateEl.element as AppView) : view
+                        );
+                    } else if (updateEl.partOf === 'fields' && updateEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === updateEl.parentId) {
+                                const updatedFields = table.fields.map(field =>
+                                    field.id === updateEl.element.id
+                                        ? (updateEl.element as AppField)
+                                        : field
+                                );
+                                const hasKey = updatedFields.some(f => f.isKey);
+                                if (!hasKey) {
+                                    throw new Error(
+                                        `Table ${table.name} must have at least one key field.`
                                     );
                                 }
 
-                                return view;
-                            });
+                                validatorCache.delete(`${appId}:${table.id}`);
+                                table.fields = updatedFields;
+                            }
 
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === addEl.parentId) {
-                                    table.fields.push(addEl.element as AppField);
-                                    validatorCache.delete(`${appId}:${table.id}`);
-                                }
+                            return table;
+                        });
+                    } else if (updateEl.partOf === 'actions' && updateEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === updateEl.parentId) {
+                                table.actions = table.actions.map(action =>
+                                    action.id === updateEl.element.id
+                                        ? (updateEl.element as AppAction)
+                                        : action
+                                );
+                            }
 
-                                return table;
-                            });
-                        } else if (addEl.partOf === 'actions' && addEl.parentId) {
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === addEl.parentId) {
-                                    table.actions.push(addEl.element as AppAction);
-                                }
+                            return table;
+                        });
+                    }
 
-                                return table;
-                            });
-                        }
+                    schemaCache.delete(appId);
+                    return sConnector.saveSchema!(appId, schema);
+                case 'delete':
+                    const delEl = request.body.element;
 
-                        schemaCache.delete(appId);
-                        return sConnector.saveSchema!(appId, schema);
-                    case 'update':
-                        const updateEl = request.body.element;
+                    if (delEl.partOf === 'tables') {
+                        schema.tables = schema.tables.filter(table => {
+                            if (table.id === delEl.elementId) {
+                                validatorCache.delete(`${appId}:${table.id}`);
+                                return false;
+                            }
 
-                        if (updateEl.partOf === 'tables') {
-                            validateTableKeys(updateEl.element as AppTable);
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === updateEl.element.id) {
-                                    validatorCache.delete(`${appId}:${table.id}`);
-                                    return updateEl.element as AppTable;
-                                }
+                            return true;
+                        });
+                    } else if (delEl.partOf === 'views') {
+                        schema.views = schema.views.filter(view => view.id !== delEl.elementId);
+                    } else if (delEl.partOf === 'fields' && delEl.parentId) {
+                        schema.views = schema.views.map(view => {
+                            if (view.tableId === delEl.parentId && view.config.fields) {
+                                view.config.fields = (view.config.fields as string[]).filter(
+                                    field => field !== delEl.elementId
+                                );
+                            }
 
-                                return table;
-                            });
-                        } else if (updateEl.partOf === 'views') {
-                            schema.views = schema.views.map(view =>
-                                view.id === updateEl.element.id
-                                    ? (updateEl.element as AppView)
-                                    : view
-                            );
-                        } else if (updateEl.partOf === 'fields' && updateEl.parentId) {
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === updateEl.parentId) {
-                                    const updatedFields = table.fields.map(field =>
-                                        field.id === updateEl.element.id
-                                            ? (updateEl.element as AppField)
-                                            : field
-                                    );
-                                    const hasKey = updatedFields.some(f => f.isKey);
-                                    if (!hasKey) {
-                                        throw new Error(
-                                            `Table ${table.name} must have at least one key field.`
-                                        );
-                                    }
+                            return view;
+                        });
 
-                                    validatorCache.delete(`${appId}:${table.id}`);
-                                    table.fields = updatedFields;
-                                }
-
-                                return table;
-                            });
-                        } else if (updateEl.partOf === 'actions' && updateEl.parentId) {
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === updateEl.parentId) {
-                                    table.actions = table.actions.map(action =>
-                                        action.id === updateEl.element.id
-                                            ? (updateEl.element as AppAction)
-                                            : action
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === delEl.parentId) {
+                                // Check if deleting this field leaves the table without a key
+                                const remainingFields = table.fields.filter(
+                                    field => field.id !== delEl.elementId
+                                );
+                                const hasKey = remainingFields.some(f => f.isKey);
+                                if (!hasKey) {
+                                    throw new Error(
+                                        `Cannot delete field. Table ${table.name} must have at least one key field.`
                                     );
                                 }
 
-                                return table;
-                            });
-                        }
+                                validatorCache.delete(`${appId}:${table.id}`);
+                                table.fields = remainingFields;
+                            }
 
-                        schemaCache.delete(appId);
-                        return sConnector.saveSchema!(appId, schema);
-                    case 'delete':
-                        const delEl = request.body.element;
+                            return table;
+                        });
+                    } else if (delEl.partOf === 'actions' && delEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === delEl.parentId) {
+                                table.actions = table.actions.filter(
+                                    action => action.id !== delEl.elementId
+                                );
+                            }
 
-                        if (delEl.partOf === 'tables') {
-                            schema.tables = schema.tables.filter(table => {
-                                if (table.id === delEl.elementId) {
-                                    validatorCache.delete(`${appId}:${table.id}`);
-                                    return false;
-                                }
+                            return table;
+                        });
+                    }
 
-                                return true;
-                            });
-                        } else if (delEl.partOf === 'views') {
-                            schema.views = schema.views.filter(view => view.id !== delEl.elementId);
-                        } else if (delEl.partOf === 'fields' && delEl.parentId) {
-                            schema.views = schema.views.map(view => {
-                                if (view.tableId === delEl.parentId && view.config.fields) {
-                                    view.config.fields = (view.config.fields as string[]).filter(
-                                        field => field !== delEl.elementId
-                                    );
-                                }
+                    schemaCache.delete(appId);
+                    return sConnector.saveSchema!(appId, schema);
+                case 'reorder':
+                    const reoEl = request.body.element;
+                    const { oldIndex, newIndex } = request.body;
 
-                                return view;
-                            });
+                    if (reoEl.partOf === 'tables') {
+                        schema.tables = reorderElement(oldIndex, newIndex, schema.tables);
+                    } else if (reoEl.partOf === 'views') {
+                        schema.views = reorderElement(oldIndex, newIndex, schema.views);
+                    } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === reoEl.parentId) {
+                                table.fields = reorderElement(oldIndex, newIndex, table.fields);
+                            }
 
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === delEl.parentId) {
-                                    // Check if deleting this field leaves the table without a key
-                                    const remainingFields = table.fields.filter(
-                                        field => field.id !== delEl.elementId
-                                    );
-                                    const hasKey = remainingFields.some(f => f.isKey);
-                                    if (!hasKey) {
-                                        throw new Error(
-                                            `Cannot delete field. Table ${table.name} must have at least one key field.`
-                                        );
-                                    }
+                            return table;
+                        });
+                    } else if (reoEl.partOf === 'actions' && reoEl.parentId) {
+                        schema.tables = schema.tables.map(table => {
+                            if (table.id === reoEl.parentId) {
+                                table.actions = reorderElement(oldIndex, newIndex, table.actions);
+                            }
 
-                                    validatorCache.delete(`${appId}:${table.id}`);
-                                    table.fields = remainingFields;
-                                }
+                            return table;
+                        });
+                    }
 
-                                return table;
-                            });
-                        } else if (delEl.partOf === 'actions' && delEl.parentId) {
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === delEl.parentId) {
-                                    table.actions = table.actions.filter(
-                                        action => action.id !== delEl.elementId
-                                    );
-                                }
-
-                                return table;
-                            });
-                        }
-
-                        schemaCache.delete(appId);
-                        return sConnector.saveSchema!(appId, schema);
-                    case 'reorder':
-                        const reoEl = request.body.element;
-                        const { oldIndex, newIndex } = request.body;
-
-                        if (reoEl.partOf === 'tables') {
-                            schema.tables = reorderElement(oldIndex, newIndex, schema.tables);
-                        } else if (reoEl.partOf === 'views') {
-                            schema.views = reorderElement(oldIndex, newIndex, schema.views);
-                        } else if (reoEl.partOf === 'fields' && reoEl.parentId) {
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === reoEl.parentId) {
-                                    table.fields = reorderElement(oldIndex, newIndex, table.fields);
-                                }
-
-                                return table;
-                            });
-                        } else if (reoEl.partOf === 'actions' && reoEl.parentId) {
-                            schema.tables = schema.tables.map(table => {
-                                if (table.id === reoEl.parentId) {
-                                    table.actions = reorderElement(
-                                        oldIndex,
-                                        newIndex,
-                                        table.actions
-                                    );
-                                }
-
-                                return table;
-                            });
-                        }
-
-                        schemaCache.delete(appId);
-                        return sConnector.saveSchema!(appId, schema);
-                }
-            } catch (err: unknown) {
-                return reply.code(400).send({
-                    error: 'Validation Error',
-                    message: (err as Error).message
-                });
+                    schemaCache.delete(appId);
+                    return sConnector.saveSchema!(appId, schema);
             }
 
             return getSchema(request.params.appId);

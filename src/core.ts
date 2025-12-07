@@ -3,7 +3,8 @@ import fastify, {
     type FastifyBaseLogger,
     type FastifyInstance,
     type FastifyServerOptions,
-    type RawServerDefault
+    type RawServerDefault,
+    type FastifyError
 } from 'fastify';
 
 import {
@@ -21,6 +22,7 @@ import fastifyCompress, { type FastifyCompressOptions } from '@fastify/compress'
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import connectorHandler, { type SchemaFXConnectorsOptions } from './plugins/index.js';
+import { ZodError } from 'zod';
 
 export type SchemaFXOptions = {
     fastifyOpts?: FastifyServerOptions;
@@ -79,9 +81,43 @@ export default class SchemaFX {
         this.fastifyInstance.register(fastifyHealthcheck, opts.healthcheckOpts ?? {});
 
         this.fastifyInstance.setErrorHandler((error, _, reply) => {
+            if ((error as FastifyError).validation) {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: (error as FastifyError).message,
+                    details: (error as FastifyError).validation
+                });
+            }
+
+            if (error instanceof ZodError) {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: error.message,
+                    details: error.issues.map(issue => ({
+                        field: issue.path.join('.'),
+                        message: issue.message,
+                        code: issue.code
+                    }))
+                });
+            }
+
+            if ((error as FastifyError).code === 'FST_ERR_VALIDATION') {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: (error as FastifyError).message
+                });
+            }
+
+            if (error instanceof SyntaxError) {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: error.message
+                });
+            }
+
             reply.log.error(error);
             return reply.status(500).send({
-                code: 'Internal Server Error',
+                error: 'Internal Server Error',
                 message: 'Unexpected error occurred.'
             });
         });
