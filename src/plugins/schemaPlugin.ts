@@ -100,7 +100,8 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                     200: AppSchemaSchema,
                     400: z.object({
                         error: z.string(),
-                        message: z.string()
+                        message: z.string(),
+                        details: z.any().optional()
                     })
                 }
             }

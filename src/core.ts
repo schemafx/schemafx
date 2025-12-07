@@ -79,6 +79,28 @@ export default class SchemaFX {
         this.fastifyInstance.register(fastifyHealthcheck, opts.healthcheckOpts ?? {});
 
         this.fastifyInstance.setErrorHandler((error, _, reply) => {
+            if (error.validation) {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: error.message,
+                    details: error.validation
+                });
+            }
+
+            if (error.code === 'FST_ERR_VALIDATION') {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: error.message
+                });
+            }
+
+            if (error instanceof SyntaxError) {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: error.message
+                });
+            }
+
             reply.log.error(error);
             return reply.status(500).send({
                 code: 'Internal Server Error',
