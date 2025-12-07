@@ -16,8 +16,8 @@ export type AppField = {
     id: string;
     name: string;
     type: AppFieldType;
-    isRequired: boolean;
-    isKey: boolean;
+    isRequired?: boolean;
+    isKey?: boolean;
     referenceTo?: string | null;
     minLength?: number | null;
     maxLength?: number | null;
@@ -35,8 +35,8 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
         id: z.string(),
         name: z.string().min(1),
         type: z.enum(Object.values(AppFieldType)),
-        isRequired: z.boolean().default(false),
-        isKey: z.boolean().default(false),
+        isRequired: z.boolean().default(true).optional(),
+        isKey: z.boolean().default(false).optional(),
 
         // Reference Constraints
         referenceTo: z.string().nullable().optional(),
@@ -75,7 +75,7 @@ export const AppActionSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(Object.values(AppActionType)),
-    config: z.looseObject({}).default({})
+    config: z.looseObject({}).default({}).optional()
 });
 
 export type AppAction = z.infer<typeof AppActionSchema>;
@@ -177,7 +177,14 @@ export abstract class Connector {
      * @param path Path to retrieve from.
      * @returns List of available tables.
      */
-    listTables?(path: string[]): Promise<ConnectorTable[]>;
+    abstract listTables(path: string[]): Promise<ConnectorTable[]>;
+
+    /**
+     * Get a Table Schema from a path.
+     * @param path Path to the Table.
+     * @returns Table Schema.
+     */
+    abstract getTable(path: string[]): Promise<AppTable>;
 
     /**
      * Get the capabilities of the connector.
@@ -239,11 +246,4 @@ export abstract class Connector {
      * @param key Key of the Row.
      */
     deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<AppTableRow[]>;
-
-    /**
-     * Get a Table Schema from a path.
-     * @param path Path to the Table.
-     * @returns Table Schema.
-     */
-    getTable?(path: string[]): Promise<AppTable>;
 }
