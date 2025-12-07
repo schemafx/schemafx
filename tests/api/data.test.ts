@@ -39,8 +39,7 @@ class LimitedConnector extends Connector {
                     id: 'id',
                     name: 'ID',
                     type: AppFieldType.Text,
-                    isKey: true,
-                    isRequired: true
+                    isKey: true
                 }
             ],
             actions: []
@@ -181,26 +180,34 @@ describe('Data API', () => {
     });
 
     it('should handle recursive relationship max depth', async () => {
-        const recursiveSchema = {
+        await connector.saveSchema!('tree', {
             id: 'tree',
             name: 'Tree',
             tables: [
                 {
                     id: 'nodes',
                     name: 'Nodes',
-                    connector: 'mem',
+                    connector: connector.id,
                     path: ['nodes'],
                     fields: [
-                        { id: 'id', name: 'ID', type: 'text', isRequired: true, isKey: true },
-                        { id: 'parent', name: 'Parent', type: 'reference', referenceTo: 'nodes' }
+                        {
+                            id: 'id',
+                            name: 'ID',
+                            type: AppFieldType.Text,
+                            isKey: true
+                        },
+                        {
+                            id: 'parent',
+                            name: 'Parent',
+                            type: AppFieldType.Reference,
+                            referenceTo: 'nodes'
+                        }
                     ],
-                    actions: [{ id: 'add', name: 'Add', type: 'add' }]
+                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
                 }
             ],
             views: []
-        };
-
-        await connector.saveSchema!('tree', recursiveSchema as any);
+        });
 
         await server.inject({
             method: 'POST',
@@ -249,8 +256,7 @@ describe('Data API', () => {
                             id: 'id',
                             name: 'ID',
                             type: AppFieldType.Text,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         }
                     ],
                     actions: []
@@ -279,22 +285,19 @@ describe('Data API', () => {
                 {
                     id: 'users',
                     name: 'Users',
-                    connector: 'mem',
+                    connector: connector.id,
                     path: ['users'],
                     fields: [
                         {
                             id: 'id',
                             name: 'ID',
                             type: AppFieldType.Number,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         },
                         {
                             id: 'name',
                             name: 'Name',
-                            type: AppFieldType.Text,
-                            isKey: false,
-                            isRequired: true
+                            type: AppFieldType.Text
                         }
                     ],
                     actions: [
@@ -338,15 +341,14 @@ describe('Data API', () => {
                 {
                     id: 'users',
                     name: 'Users',
-                    connector: 'mem',
+                    connector: connector.id,
                     path: ['users'],
                     fields: [
                         {
                             id: 'id',
                             name: 'ID',
                             type: AppFieldType.Number,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         }
                     ],
                     actions: [
@@ -408,9 +410,9 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
                     connector: limitedConnector.id,
                     path: ['users'],
                     fields: [
-                        { id: 'id', name: 'ID', type: 'number', isKey: true },
-                        { id: 'name', name: 'Name', type: 'text' },
-                        { id: 'age', name: 'Age', type: 'number' }
+                        { id: 'id', name: 'ID', type: AppFieldType.Number, isKey: true },
+                        { id: 'name', name: 'Name', type: AppFieldType.Text },
+                        { id: 'age', name: 'Age', type: AppFieldType.Number }
                     ],
                     actions: []
                 }

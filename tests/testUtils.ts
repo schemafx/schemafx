@@ -21,15 +21,12 @@ export async function createTestApp(includeToken?: boolean) {
                         id: 'id',
                         name: 'ID',
                         type: AppFieldType.Number,
-                        isRequired: true,
                         isKey: true
                     },
                     {
                         id: 'name',
                         name: 'Name',
-                        type: AppFieldType.Text,
-                        isRequired: true,
-                        isKey: false
+                        type: AppFieldType.Text
                     }
                 ],
                 actions: [

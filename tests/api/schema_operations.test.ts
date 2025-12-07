@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestApp } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
-import { AppActionType, type AppSchema, AppViewType, type Connector } from '../../src/index.js';
+import {
+    AppActionType,
+    AppFieldType,
+    type AppSchema,
+    AppViewType,
+    type Connector
+} from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
 
 describe('Schema Operations', () => {
@@ -49,14 +55,6 @@ describe('Schema Operations', () => {
     });
 
     it('should add a field', async () => {
-        const newField = {
-            id: 'email',
-            name: 'Email',
-            type: 'email',
-            isRequired: false,
-            isKey: false
-        };
-
         const response = await server.inject({
             method: 'POST',
             url: '/api/apps/app1/schema',
@@ -66,7 +64,11 @@ describe('Schema Operations', () => {
                 element: {
                     partOf: 'fields',
                     parentId: 'users',
-                    element: newField
+                    element: {
+                        id: 'email',
+                        name: 'Email',
+                        type: AppFieldType.Email
+                    }
                 }
             }
         });
@@ -111,9 +113,9 @@ describe('Schema Operations', () => {
         const table = {
             id: 'users',
             name: 'Users Updated',
-            connector: 'mem',
+            connector: connector.id,
             path: ['users'],
-            fields: [{ id: 'id', name: 'ID', type: 'number', isRequired: true, isKey: true }],
+            fields: [{ id: 'id', name: 'ID', type: AppFieldType.Number, isKey: true }],
             actions: []
         };
 

@@ -69,7 +69,6 @@ describe('Schema API', () => {
                                 id: 'f1',
                                 name: 'F1',
                                 type: AppFieldType.Text,
-                                isRequired: true,
                                 isKey: true
                             }
                         ],
@@ -130,8 +129,7 @@ describe('Schema API', () => {
                             id: 'f1',
                             name: 'F1',
                             type: AppFieldType.Text,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         }
                     ],
                     actions: []
@@ -192,15 +190,12 @@ describe('Schema API', () => {
                             id: 'f1',
                             name: 'F1',
                             type: AppFieldType.Text,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         },
                         {
                             id: 'f2',
                             name: 'F2',
-                            type: AppFieldType.Text,
-                            isKey: false,
-                            isRequired: true
+                            type: AppFieldType.Text
                         }
                     ],
                     actions: []
@@ -257,8 +252,7 @@ describe('Schema API', () => {
                             id: 'f1',
                             name: 'F1',
                             type: AppFieldType.Text,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         }
                     ],
                     actions: []
@@ -301,8 +295,7 @@ describe('Schema API', () => {
                             id: 'f1',
                             name: 'F1',
                             type: AppFieldType.Text,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         }
                     ],
                     actions: []
@@ -323,9 +316,7 @@ describe('Schema API', () => {
                     element: {
                         id: 'f1',
                         name: 'F1',
-                        type: AppFieldType.Text,
-                        isKey: false,
-                        isRequired: true
+                        type: AppFieldType.Text
                     }
                 }
             }
@@ -351,8 +342,7 @@ describe('Schema API', () => {
                             id: 'f1',
                             name: 'F1',
                             type: AppFieldType.Text,
-                            isKey: true,
-                            isRequired: true
+                            isKey: true
                         }
                     ],
                     actions: []

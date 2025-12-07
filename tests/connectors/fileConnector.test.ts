@@ -8,6 +8,7 @@ const TEST_DB_PATH = path.join(process.cwd(), 'tests', 'test_db.json');
 
 describe('FileConnector', () => {
     let connector: FileConnector;
+    const connectorId = 'file';
 
     beforeEach(async () => {
         // Clean up previous test runs if any
@@ -15,7 +16,7 @@ describe('FileConnector', () => {
             await unlink(TEST_DB_PATH);
         } catch {}
 
-        connector = new FileConnector('File', TEST_DB_PATH, 'file');
+        connector = new FileConnector('File', TEST_DB_PATH, connectorId);
     });
 
     afterEach(async () => {
@@ -26,7 +27,7 @@ describe('FileConnector', () => {
 
     it('should initialize correctly', () => {
         expect(connector.name).toBe('File');
-        expect(connector.id).toBe('file');
+        expect(connector.id).toBe(connectorId);
     });
 
     it('should save and get schema', async () => {
@@ -62,16 +63,14 @@ describe('FileConnector', () => {
         const table: AppTable = {
             id: 'users',
             name: 'Users',
-            connector: 'file',
+            connector: connectorId,
             path: ['users'],
             fields: [
-                { id: 'id', name: 'ID', type: AppFieldType.Number, isRequired: true, isKey: true },
+                { id: 'id', name: 'ID', type: AppFieldType.Number, isKey: true },
                 {
                     id: 'name',
                     name: 'Name',
-                    type: AppFieldType.Text,
-                    isRequired: true,
-                    isKey: false
+                    type: AppFieldType.Text
                 }
             ],
             actions: []

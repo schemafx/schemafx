@@ -18,9 +18,7 @@ describe('schemaUtils', () => {
             const schema = zodFromField({
                 id: 'test',
                 name: 'Test',
-                type: AppFieldType.Text,
-                isRequired: true,
-                isKey: false
+                type: AppFieldType.Text
             });
 
             expect(schema.safeParse('valid').success).toBe(true);
@@ -32,8 +30,6 @@ describe('schemaUtils', () => {
                 id: 'test',
                 name: 'Test',
                 type: AppFieldType.Text,
-                isRequired: true,
-                isKey: false,
                 minLength: 2,
                 maxLength: 5
             });
@@ -48,8 +44,6 @@ describe('schemaUtils', () => {
                 id: 'num',
                 name: 'Num',
                 type: AppFieldType.Number,
-                isRequired: true,
-                isKey: false,
                 minValue: 0,
                 maxValue: 10
             });
@@ -63,9 +57,7 @@ describe('schemaUtils', () => {
             const schema = zodFromField({
                 id: 'bool',
                 name: 'Bool',
-                type: AppFieldType.Boolean,
-                isRequired: true,
-                isKey: false
+                type: AppFieldType.Boolean
             });
 
             expect(schema.safeParse(true).success).toBe(true);
@@ -77,8 +69,6 @@ describe('schemaUtils', () => {
                 id: 'date',
                 name: 'Date',
                 type: AppFieldType.Date,
-                isRequired: true,
-                isKey: false,
                 startDate: new Date('2023-01-01'),
                 endDate: new Date('2023-12-31')
             });
@@ -92,9 +82,7 @@ describe('schemaUtils', () => {
             const schema = zodFromField({
                 id: 'email',
                 name: 'Email',
-                type: AppFieldType.Email,
-                isRequired: true,
-                isKey: false
+                type: AppFieldType.Email
             });
 
             expect(schema.safeParse('test@example.com').success).toBe(true);
@@ -106,8 +94,6 @@ describe('schemaUtils', () => {
                 id: 'drop',
                 name: 'Drop',
                 type: AppFieldType.Dropdown,
-                isRequired: true,
-                isKey: false,
                 options: ['a', 'b']
             });
 
@@ -120,8 +106,6 @@ describe('schemaUtils', () => {
                 id: 'drop',
                 name: 'Drop',
                 type: AppFieldType.Dropdown,
-                isRequired: true,
-                isKey: false,
                 options: []
             });
 
@@ -133,15 +117,11 @@ describe('schemaUtils', () => {
                 id: 'json',
                 name: 'Json',
                 type: AppFieldType.JSON,
-                isRequired: true,
-                isKey: false,
                 fields: [
                     {
                         id: 'sub',
                         name: 'Sub',
-                        type: AppFieldType.Text,
-                        isRequired: true,
-                        isKey: false
+                        type: AppFieldType.Text
                     }
                 ]
             });
@@ -155,8 +135,6 @@ describe('schemaUtils', () => {
                 id: 'json',
                 name: 'Json',
                 type: AppFieldType.JSON,
-                isRequired: true,
-                isKey: false,
                 fields: []
             });
 
@@ -168,14 +146,10 @@ describe('schemaUtils', () => {
                 id: 'list',
                 name: 'List',
                 type: AppFieldType.List,
-                isRequired: true,
-                isKey: false,
                 child: {
                     id: 'sub',
                     name: 'Sub',
-                    type: AppFieldType.Text,
-                    isRequired: true,
-                    isKey: false
+                    type: AppFieldType.Text
                 }
             });
 
@@ -187,9 +161,7 @@ describe('schemaUtils', () => {
             const schema = zodFromField({
                 id: 'list',
                 name: 'List',
-                type: AppFieldType.List,
-                isRequired: true,
-                isKey: false
+                type: AppFieldType.List
             });
 
             expect(schema.safeParse(['a', 1]).success).toBe(true);
@@ -199,9 +171,7 @@ describe('schemaUtils', () => {
             const schema = zodFromField({
                 id: 'opt',
                 name: 'Opt',
-                type: AppFieldType.Text,
-                isRequired: false,
-                isKey: false
+                type: AppFieldType.Text
             });
 
             expect(schema.safeParse(undefined).success).toBe(true);
@@ -215,9 +185,7 @@ describe('schemaUtils', () => {
                 {
                     id: 'f1',
                     name: 'F1',
-                    type: AppFieldType.Text,
-                    isRequired: true,
-                    isKey: false
+                    type: AppFieldType.Text
                 }
             ]);
 
@@ -236,9 +204,7 @@ describe('schemaUtils', () => {
                     {
                         id: 'f1',
                         name: 'F1',
-                        type: AppFieldType.Text,
-                        isRequired: true,
-                        isKey: false
+                        type: AppFieldType.Text
                     }
                 ],
                 actions: []
@@ -271,7 +237,6 @@ describe('schemaUtils', () => {
                             id: 'f1',
                             name: 'F1',
                             type: AppFieldType.Text,
-                            isRequired: true,
                             isKey: true
                         }
                     ],
@@ -290,9 +255,7 @@ describe('schemaUtils', () => {
                         {
                             id: 'f1',
                             name: 'F1',
-                            type: AppFieldType.Text,
-                            isRequired: true,
-                            isKey: false
+                            type: AppFieldType.Text
                         }
                     ],
                     actions: []

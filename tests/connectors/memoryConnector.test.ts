@@ -47,13 +47,11 @@ describe('MemoryConnector', () => {
             connector: connectorId,
             path: ['users'],
             fields: [
-                { id: 'id', name: 'ID', type: AppFieldType.Number, isRequired: true, isKey: true },
+                { id: 'id', name: 'ID', type: AppFieldType.Number, isKey: true },
                 {
                     id: 'name',
                     name: 'Name',
-                    type: AppFieldType.Text,
-                    isRequired: true,
-                    isKey: false
+                    type: AppFieldType.Text
                 }
             ],
             actions: []
