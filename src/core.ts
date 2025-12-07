@@ -80,7 +80,7 @@ export default class SchemaFX {
         this.fastifyInstance.register(fastifyHealthcheck, opts.healthcheckOpts ?? {});
 
         this.fastifyInstance.setErrorHandler((error, _, reply) => {
-            if (error.validation) {
+            if (error instanceof Error && error.validation) {
                 return reply.status(400).send({
                     error: 'Bad Request',
                     message: error.message,
@@ -100,7 +100,7 @@ export default class SchemaFX {
                 });
             }
 
-            if (error.code === 'FST_ERR_VALIDATION') {
+            if (error instanceof Error && error.code === 'FST_ERR_VALIDATION') {
                 return reply.status(400).send({
                     error: 'Bad Request',
                     message: error.message
