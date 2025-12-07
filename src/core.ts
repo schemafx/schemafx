@@ -21,6 +21,7 @@ import fastifyCompress, { type FastifyCompressOptions } from '@fastify/compress'
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import connectorHandler, { type SchemaFXConnectorsOptions } from './plugins/index.js';
+import { ZodError } from 'zod';
 
 export type SchemaFXOptions = {
     fastifyOpts?: FastifyServerOptions;
@@ -84,6 +85,18 @@ export default class SchemaFX {
                     error: 'Bad Request',
                     message: error.message,
                     details: error.validation
+                });
+            }
+
+            if (error instanceof ZodError) {
+                return reply.status(400).send({
+                    error: 'Bad Request',
+                    message: error.message,
+                    details: error.issues.map(issue => ({
+                        field: issue.path.join('.'),
+                        message: issue.message,
+                        code: issue.code
+                    }))
                 });
             }
 
