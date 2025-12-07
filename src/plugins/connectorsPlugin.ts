@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { type Connector, AppSchemaSchema, ConnectorTableSchema } from '../types.js';
-import { validateTableKeys } from '../utils/schemaUtils.js';
+import { validateTableKeys, ErrorResponseSchema } from '../utils/schemaUtils.js';
 import type { AppSchema } from '../types.js';
 import { randomUUID } from 'node:crypto';
 import { LRUCache } from 'lru-cache';
@@ -27,12 +27,14 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
         {
             schema: {
                 response: {
-                    200: z.array(
-                        z.object({
-                            id: z.string(),
-                            name: z.string()
-                        })
-                    )
+                    200: z
+                        .array(
+                            z.object({
+                                id: z.string().meta({ description: 'Connector ID' }),
+                                name: z.string().meta({ description: 'Connector Name' })
+                            })
+                        )
+                        .meta({ description: 'List of available connectors' })
                 }
             }
         },
@@ -44,20 +46,18 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
         {
             onRequest: [fastify.authenticate],
             schema: {
-                params: z.object({ connectorName: z.string().min(1) }),
+                params: z.object({
+                    connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
+                }),
                 body: z.object({
-                    path: z.array(z.string())
+                    path: z.array(z.string()).meta({ description: 'Path to query tables from' })
                 }),
                 response: {
-                    200: z.array(ConnectorTableSchema),
-                    404: z.object({
-                        error: z.string(),
-                        message: z.string()
-                    }),
-                    400: z.object({
-                        error: z.string(),
-                        message: z.string()
-                    })
+                    200: z
+                        .array(ConnectorTableSchema)
+                        .meta({ description: 'List of tables found' }),
+                    404: ErrorResponseSchema,
+                    400: ErrorResponseSchema
                 }
             }
         },
@@ -80,21 +80,21 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
         {
             onRequest: [fastify.authenticate],
             schema: {
-                params: z.object({ connectorName: z.string().min(1) }),
+                params: z.object({
+                    connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
+                }),
                 body: z.object({
-                    path: z.array(z.string()),
-                    appId: z.string().min(1).optional()
+                    path: z.array(z.string()).meta({ description: 'Path to the table' }),
+                    appId: z
+                        .string()
+                        .min(1)
+                        .optional()
+                        .meta({ description: 'Application ID to add the table to' })
                 }),
                 response: {
                     200: AppSchemaSchema,
-                    404: z.object({
-                        error: z.string(),
-                        message: z.string()
-                    }),
-                    400: z.object({
-                        error: z.string(),
-                        message: z.string()
-                    })
+                    404: ErrorResponseSchema,
+                    400: ErrorResponseSchema
                 }
             }
         },
