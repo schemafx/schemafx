@@ -102,21 +102,18 @@ export default class FileConnector extends Connector {
 
     async addRow(table: AppTable, row?: AppTableRow) {
         const db = await this._readDB();
-        if (!row) return db.tables[table.path[0]] || [];
+        if (!row) return;
 
         if (!db.tables[table.path[0]]) db.tables[table.path[0]] = [];
 
         db.tables[table.path[0]].push(row);
         await this._writeDB(db);
-
-        return db.tables[table.path[0]];
     }
 
     async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
         const db = await this._readDB();
-        if (!key || !row) return db.tables[table.path[0]] || [];
-
-        if (!db.tables[table.path[0]]) return [];
+        if (!key || !row) return;
+        if (!db.tables[table.path[0]]) return;
 
         const data = db.tables[table.path[0]];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
@@ -125,15 +122,12 @@ export default class FileConnector extends Connector {
             data[rowIndex] = { ...data[rowIndex], ...row };
             await this._writeDB(db);
         }
-
-        return data;
     }
 
     async deleteRow(table: AppTable, key?: Record<string, unknown>) {
         const db = await this._readDB();
-        if (!key) return db.tables[table.path[0]] || [];
-
-        if (!db.tables[table.path[0]]) return [];
+        if (!key) return;
+        if (!db.tables[table.path[0]]) return;
 
         const data = db.tables[table.path[0]];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
@@ -142,7 +136,5 @@ export default class FileConnector extends Connector {
             data.splice(rowIndex, 1);
             await this._writeDB(db);
         }
-
-        return data;
     }
 }

@@ -233,7 +233,7 @@ export abstract class Connector {
      * @param table Table.
      * @param row Table Row.
      */
-    addRow?(table: AppTable, row?: AppTableRow): Promise<AppTableRow[]>;
+    addRow?(table: AppTable, row?: AppTableRow): Promise<void>;
 
     /**
      * Update a Row from the Table.
@@ -241,16 +241,12 @@ export abstract class Connector {
      * @param key Key of the Row.
      * @param row Table Row.
      */
-    updateRow?(
-        table: AppTable,
-        key?: Record<string, unknown>,
-        row?: AppTableRow
-    ): Promise<AppTableRow[]>;
+    updateRow?(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow): Promise<void>;
 
     /**
      * Delete a Row from the Table.
      * @param table Table.
      * @param key Key of the Row.
      */
-    deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<AppTableRow[]>;
+    deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<void>;
 }

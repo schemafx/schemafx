@@ -6,7 +6,8 @@ import {
     AppTableRowSchema,
     TableQueryOptionsSchema,
     AppActionType,
-    type Connector
+    type Connector,
+    type AppTable
 } from '../types.js';
 import { zodFromTable, extractKeys, tableQuerySchema } from '../utils/schemaUtils.js';
 import {
@@ -69,6 +70,55 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
         return { schema, table, connectorName, connector, success: true };
     }
 
+    async function handleDataRetriever(table: AppTable, connector: Connector, queryStr?: string) {
+        let query;
+        if (queryStr) {
+            query = JSON.parse(queryStr);
+            const parsed = await TableQueryOptionsSchema.parseAsync(query);
+            query = parsed;
+        }
+
+        if (!connector.getData && !connector.getDataStream) return [];
+
+        const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
+        const dbInstance = await createDuckDBInstance();
+        const connection = await dbInstance.connect();
+
+        if (connector.getDataStream) {
+            await ingestStreamToDuckDB(
+                connection,
+                await connector.getDataStream(table),
+                table,
+                tempTableName
+            );
+        } else {
+            await ingestDataToDuckDB(
+                connection,
+                await connector.getData!(table),
+                table,
+                tempTableName
+            );
+        }
+
+        const { sql, params } = buildSQLQuery(tempTableName, query || {});
+        const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
+        const rows = await reader.getRows();
+
+        const result = rows.map(row => {
+            const obj: Record<string, unknown> = {};
+            table.fields.forEach((field, index) => {
+                obj[field.id] = row[index];
+            });
+
+            return obj;
+        });
+
+        await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
+        connection.closeSync();
+
+        return result;
+    }
+
     fastify.get(
         '/apps/:appId/data/:tableId',
         {
@@ -76,63 +126,15 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
             schema: tableQuerySchema
         },
         async (request, reply) => {
-            const { appId, tableId } = request.params;
-            const { query: queryStr } = request.query;
-
             const { response, success, connector, table } = await handleTable(
-                appId,
-                tableId,
+                request.params.appId,
+                request.params.tableId,
                 reply
             );
 
             if (!success || !table) return response;
 
-            let query;
-            if (queryStr) {
-                query = JSON.parse(queryStr);
-                const parsed = await TableQueryOptionsSchema.parseAsync(query);
-                query = parsed;
-            }
-
-            if (!connector.getData && !connector.getDataStream) return [];
-
-            const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
-            const dbInstance = await createDuckDBInstance();
-            const connection = await dbInstance.connect();
-
-            if (connector.getDataStream) {
-                await ingestStreamToDuckDB(
-                    connection,
-                    await connector.getDataStream(table),
-                    table,
-                    tempTableName
-                );
-            } else {
-                await ingestDataToDuckDB(
-                    connection,
-                    await connector.getData!(table),
-                    table,
-                    tempTableName
-                );
-            }
-
-            const { sql, params } = buildSQLQuery(tempTableName, query || {});
-            const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
-            const rows = await reader.getRows();
-
-            const result = rows.map(row => {
-                const obj: Record<string, unknown> = {};
-                table.fields.forEach((field, index) => {
-                    obj[field.id] = row[index];
-                });
-
-                return obj;
-            });
-
-            await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
-            connection.closeSync();
-
-            return result;
+            return handleDataRetriever(table, connector, request.query.query);
         }
     );
 
@@ -169,11 +171,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
 
             const keyFields = table.fields.filter(f => f.isKey).map(f => f.id);
 
-            async function executeAction(
-                actId: string,
-                currentRows: AppTableRow[],
-                depth: number
-            ): Promise<unknown> {
+            async function executeAction(actId: string, currentRows: AppTableRow[], depth: number) {
                 if (depth > MAX_DEPTH) {
                     throw new Error('Max recursion depth exceeded.');
                 }
@@ -189,7 +187,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                             await connector?.addRow?.(table, rowResult as Record<string, unknown>);
                         }
 
-                        return connector?.getData?.(table) || [];
+                        return;
                     }
                     case AppActionType.Update: {
                         const validator = zodFromTable(table!, appId, validatorCache);
@@ -205,7 +203,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                             );
                         }
 
-                        return connector?.getData?.(table) || [];
+                        return;
                     }
                     case AppActionType.Delete: {
                         for (const row of currentRows) {
@@ -215,22 +213,22 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                             await connector?.deleteRow?.(table, key);
                         }
 
-                        return connector?.getData?.(table) || [];
+                        return;
                     }
                     case AppActionType.Process: {
                         const subActions = (action.config?.actions as string[]) || [];
-                        let lastResult;
 
                         for (const subActionId of subActions) {
-                            lastResult = await executeAction(subActionId, currentRows, depth + 1);
+                            await executeAction(subActionId, currentRows, depth + 1);
                         }
 
-                        return lastResult;
+                        return;
                     }
                 }
             }
 
-            return executeAction(actionId, rows, 0);
+            await executeAction(actionId, rows, 0);
+            return handleDataRetriever(table, connector);
         }
     );
 };

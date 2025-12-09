@@ -59,9 +59,11 @@ describe('MemoryConnector', () => {
 
         it('should add row', async () => {
             const row = { id: 1, name: 'User 1' };
-            const result = await connector.addRow!(table, row);
-            expect(result).toHaveLength(1);
-            expect(result[0]).toEqual(row);
+            await connector.addRow!(table, row);
+
+            const data = await connector.getData!(table);
+            expect(data).toHaveLength(1);
+            expect(data[0]).toEqual(row);
         });
 
         it('should get data', async () => {
@@ -74,13 +76,7 @@ describe('MemoryConnector', () => {
 
         it('should update row', async () => {
             await connector.addRow!(table, { id: 1, name: 'User 1' });
-            const updated = await connector.updateRow!(
-                table,
-                { id: 1 },
-                { id: 1, name: 'Updated' }
-            );
-
-            expect(updated[0].name).toBe('Updated');
+            await connector.updateRow!(table, { id: 1 }, { id: 1, name: 'Updated' });
 
             const data = await connector.getData!(table);
             expect(data[0].name).toBe('Updated');

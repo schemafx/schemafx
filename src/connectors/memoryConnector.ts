@@ -62,41 +62,35 @@ export default class MemoryConnector extends Connector {
 
     async addRow(table: AppTable, row?: AppTableRow) {
         const data = await this.getData(table);
-        if (!row) return data;
+        if (!row) return;
 
         data.push(row);
         this.tables.set(table.path[0], data);
-
-        return data;
     }
 
     async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
         const data = await this.getData(table);
 
-        if (!key || !row) return data;
+        if (!key || !row) return;
 
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
-        if (rowIndex === -1) return data;
+        if (rowIndex === -1) return;
 
         data[rowIndex] = { ...data[rowIndex], ...row };
         this.tables.set(table.path[0], data);
-
-        return data;
     }
 
     async deleteRow(table: AppTable, key?: Record<string, unknown>) {
         const data = await this.getData(table);
 
-        if (!key) return data;
+        if (!key) return;
 
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
-        if (rowIndex === -1) return data;
+        if (rowIndex === -1) return;
 
         data.splice(rowIndex, 1);
         this.tables.set(table.path[0], data);
-
-        return data;
     }
 }
