@@ -84,6 +84,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                 tableId,
                 reply
             );
+
             if (!success || !table) return response;
 
             let query;
