@@ -5,14 +5,22 @@ import {
     type AppTableRow,
     AppTableRowSchema,
     TableQueryOptionsSchema,
-    type TableQueryOptions,
-    QueryFilterOperator,
     AppActionType,
     type Connector
 } from '../types.js';
 import { zodFromTable, extractKeys, tableQuerySchema } from '../utils/schemaUtils.js';
+import {
+    createDuckDBInstance,
+    ingestStreamToDuckDB,
+    buildSQLQuery,
+    ingestDataToDuckDB
+} from '../utils/duckdb.js';
 import { LRUCache } from 'lru-cache';
 import type { FastifyReply } from 'fastify';
+import type { DuckDBValue } from '@duckdb/node-api';
+import knex from 'knex';
+
+const qb = knex({ client: 'pg' });
 
 export type DataPluginOptions = {
     connectors: Record<string, Connector>;
@@ -85,101 +93,45 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                 query = parsed;
             }
 
-            let finalQuery: TableQueryOptions | undefined;
-            let qMissingCaps: TableQueryOptions | undefined;
+            if (!connector.getData && !connector.getDataStream) return [];
 
-            if (query) {
-                const capabilities = connector.getCapabilities
-                    ? await connector.getCapabilities(table)
-                    : {};
+            const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
+            const dbInstance = await createDuckDBInstance();
+            const connection = await dbInstance.connect();
 
-                if (query.filters?.length) {
-                    let filterValid = true;
-                    for (const filter of query.filters) {
-                        if (capabilities.filter?.[filter.operator]) continue;
-
-                        filterValid = false;
-                        break;
-                    }
-
-                    if (filterValid) {
-                        if (!finalQuery) finalQuery = {};
-                        finalQuery.filters = query.filters;
-                    } else {
-                        if (!qMissingCaps) qMissingCaps = {};
-                        qMissingCaps.filters = query.filters;
-                    }
-                }
-
-                if (typeof query.limit === 'number') {
-                    if (
-                        // Cannot have limit from query if missing filters.
-                        // Would otherwise make inaccurate limit.
-                        !qMissingCaps?.filters &&
-                        typeof capabilities.limit?.min === 'number' &&
-                        typeof capabilities.limit?.max === 'number' &&
-                        query.limit >= capabilities.limit.min &&
-                        query.limit <= capabilities.limit.max
-                    ) {
-                        if (!finalQuery) finalQuery = {};
-                        finalQuery.limit = query.limit;
-                    } else {
-                        if (!qMissingCaps) qMissingCaps = {};
-                        qMissingCaps.limit = query.limit;
-                    }
-                }
-
-                if (typeof query.offset === 'number') {
-                    if (
-                        // Cannot have offset from query if missing filters.
-                        // Would otherwise make inaccurate offset.
-                        !qMissingCaps?.filters &&
-                        typeof capabilities.offset?.min === 'number' &&
-                        typeof capabilities.offset?.max === 'number' &&
-                        query.offset >= capabilities.offset.min &&
-                        query.offset <= capabilities.offset.max
-                    ) {
-                        if (!finalQuery) finalQuery = {};
-                        finalQuery.offset = query.offset;
-                    } else {
-                        if (!qMissingCaps) qMissingCaps = {};
-                        qMissingCaps.offset = query.offset;
-                    }
-                }
-            }
-
-            let data = await connector.getData!(table, finalQuery);
-            if (!qMissingCaps) return data;
-
-            if (qMissingCaps.filters) {
-                data = data.filter(row =>
-                    qMissingCaps.filters!.every(filter => {
-                        const rowValue = row[filter.field] as unknown;
-                        switch (filter.operator) {
-                            case QueryFilterOperator.Equals:
-                                return rowValue === filter.value;
-                            case QueryFilterOperator.NotEqual:
-                                return rowValue !== filter.value;
-                            case QueryFilterOperator.GreaterThan:
-                                return (rowValue as number) > filter.value;
-                            case QueryFilterOperator.GreaterThanOrEqualTo:
-                                return (rowValue as number) >= filter.value;
-                            case QueryFilterOperator.LowerThan:
-                                return (rowValue as number) < filter.value;
-                            case QueryFilterOperator.LowerThanOrEqualTo:
-                                return (rowValue as number) <= filter.value;
-                            case QueryFilterOperator.Contains:
-                                return String(rowValue).includes(String(filter.value));
-                            default:
-                                return true;
-                        }
-                    })
+            if (connector.getDataStream) {
+                await ingestStreamToDuckDB(
+                    connection,
+                    await connector.getDataStream(table),
+                    table,
+                    tempTableName
+                );
+            } else {
+                await ingestDataToDuckDB(
+                    connection,
+                    await connector.getData!(table),
+                    table,
+                    tempTableName
                 );
             }
 
-            if (typeof qMissingCaps.offset === 'number') data = data.slice(qMissingCaps.offset);
-            if (typeof qMissingCaps.limit === 'number') data = data.slice(0, qMissingCaps.limit);
-            return data;
+            const { sql, params } = buildSQLQuery(tempTableName, query || {});
+            const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
+            const rows = await reader.getRows();
+
+            const result = rows.map(row => {
+                const obj: Record<string, unknown> = {};
+                table.fields.forEach((field, index) => {
+                    obj[field.id] = row[index];
+                });
+
+                return obj;
+            });
+
+            await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
+            connection.closeSync();
+
+            return result;
         }
     );
 
