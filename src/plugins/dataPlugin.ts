@@ -226,8 +226,6 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
 
                         return lastResult;
                     }
-                    default:
-                        return null;
                 }
             }
 
