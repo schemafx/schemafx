@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Readable } from 'node:stream';
 
 export enum AppFieldType {
     Text = 'text',
@@ -220,6 +221,12 @@ export abstract class Connector {
      * @param query Query Options.
      */
     getData?(table: AppTable, query?: TableQueryOptions): Promise<AppTableRow[]>;
+
+    /**
+     * Get data from a Table as a Stream.
+     * @param table Table.
+     */
+    getDataStream?(table: AppTable): Promise<Readable>;
 
     /**
      * Add a new Row to the Table.
