@@ -17,7 +17,7 @@ export const ErrorResponseSchema = z
  * @param field Field to generate the validator from.
  * @returns Zod schema for the field.
  */
-export function zodFromField(field: AppField): z.ZodAny {
+export function zodFromField(field: AppField): z.ZodType {
     let fld;
 
     switch (field.type) {
@@ -73,7 +73,7 @@ export function zodFromFields(fields: AppField[]) {
  * @param table Table to generate the validator from.
  * @returns Zod object validator from table.
  */
-export function zodFromTable(table: AppTable, appId: string, cache: LRUCache<string, z.ZodAny>) {
+export function zodFromTable(table: AppTable, appId: string, cache: LRUCache<string, z.ZodType>) {
     const cacheKey = `${appId}:${table.id}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 

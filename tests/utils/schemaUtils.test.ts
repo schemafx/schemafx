@@ -210,7 +210,7 @@ describe('schemaUtils', () => {
                 actions: []
             };
 
-            const cache = new LRUCache<string, z.ZodAny>({ max: 10 });
+            const cache = new LRUCache<string, z.ZodType>({ max: 10 });
             const s1 = zodFromTable(table, 'app1', cache);
             expect(cache.has('app1:t1')).toBe(true);
 

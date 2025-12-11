@@ -26,7 +26,7 @@ const qb = knex({ client: 'pg' });
 export type DataPluginOptions = {
     connectors: Record<string, Connector>;
     getSchema: (appId: string) => Promise<AppSchema>;
-    validatorCache: LRUCache<string, z.ZodAny>;
+    validatorCache: LRUCache<string, z.ZodType>;
     maxRecursiveDepth?: number;
 };
 

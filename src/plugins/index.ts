@@ -26,7 +26,7 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify,
     { schemaConnector, connectors, maxRecursiveDepth, validatorCacheOpts, schemaCacheOpts }
 ) => {
-    const validatorCache = new LRUCache<string, z.ZodAny>({
+    const validatorCache = new LRUCache<string, z.ZodType>({
         max: validatorCacheOpts?.max ?? 500,
         ttl: validatorCacheOpts?.ttl ?? 1000 * 60 * 60
     });
