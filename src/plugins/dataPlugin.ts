@@ -7,8 +7,10 @@ import {
     TableQueryOptionsSchema,
     AppActionType,
     type Connector,
-    type AppTable
+    type AppTable,
+    AppFieldType
 } from '../types.js';
+import { encrypt, decrypt } from '../utils/encryption.js';
 import { zodFromTable, extractKeys, tableQuerySchema } from '../utils/schemaUtils.js';
 import {
     createDuckDBInstance,
@@ -28,11 +30,66 @@ export type DataPluginOptions = {
     getSchema: (appId: string) => Promise<AppSchema>;
     validatorCache: LRUCache<string, z.ZodType>;
     maxRecursiveDepth?: number;
+    encryptionKey?: string;
 };
+
+function encodeRow(
+    row: Record<string, unknown>,
+    table: AppTable,
+    encryptionKey?: string
+): Record<string, unknown> {
+    if (!encryptionKey) return row;
+    const processedRow = { ...row };
+
+    for (const field of table.fields) {
+        if (
+            field.encrypted &&
+            (field.type === AppFieldType.Text || field.type === AppFieldType.JSON) &&
+            processedRow[field.id] !== undefined &&
+            processedRow[field.id] !== null
+        ) {
+            let valueToEncrypt = processedRow[field.id];
+            if (field.type === AppFieldType.JSON) valueToEncrypt = JSON.stringify(valueToEncrypt);
+
+            processedRow[field.id] = encrypt(String(valueToEncrypt), encryptionKey);
+        }
+    }
+
+    return processedRow;
+}
+
+function decodeRow(
+    row: Record<string, unknown>,
+    table: AppTable,
+    encryptionKey?: string
+): Record<string, unknown> {
+    if (!encryptionKey) return row;
+    const processedRow = { ...row };
+
+    for (const field of table.fields) {
+        let value = processedRow[field.id];
+
+        if (
+            field.encrypted &&
+            value !== undefined &&
+            value !== null &&
+            typeof value === 'string' &&
+            (field.type === AppFieldType.Text || field.type === AppFieldType.JSON)
+        ) {
+            const decrypted = decrypt(value, encryptionKey);
+            if (field.type === AppFieldType.JSON) value = JSON.parse(decrypted);
+            else value = decrypted;
+
+            processedRow[field.id] = value;
+        }
+    }
+
+    return processedRow;
+}
 
 const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
     fastify,
-    { connectors, getSchema, validatorCache, maxRecursiveDepth }
+    { connectors, getSchema, validatorCache, maxRecursiveDepth, encryptionKey }
 ) => {
     const MAX_DEPTH = maxRecursiveDepth ?? 100;
 
@@ -110,7 +167,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                 obj[field.id] = row[index];
             });
 
-            return obj;
+            return decodeRow(obj, table, encryptionKey);
         });
 
         await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
@@ -183,8 +240,14 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                     case AppActionType.Add: {
                         const validator = zodFromTable(table!, appId, validatorCache);
                         for (const row of currentRows) {
-                            const rowResult = await validator.parseAsync(row);
-                            await connector?.addRow?.(table, rowResult as Record<string, unknown>);
+                            await connector?.addRow?.(
+                                table,
+                                encodeRow(
+                                    (await validator.parseAsync(row)) as Record<string, unknown>,
+                                    table!,
+                                    encryptionKey
+                                )
+                            );
                         }
 
                         return;
@@ -192,14 +255,17 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
                     case AppActionType.Update: {
                         const validator = zodFromTable(table!, appId, validatorCache);
                         for (const row of currentRows) {
-                            const rowData = await validator.parseAsync(row);
                             const key = extractKeys(row, keyFields);
                             if (Object.keys(key).length === 0) continue;
 
                             await connector?.updateRow?.(
                                 table,
                                 key,
-                                rowData as Record<string, unknown>
+                                encodeRow(
+                                    (await validator.parseAsync(row)) as Record<string, unknown>,
+                                    table!,
+                                    encryptionKey
+                                )
                             );
                         }
 

@@ -19,6 +19,7 @@ export type AppField = {
     type: AppFieldType;
     isRequired?: boolean;
     isKey?: boolean;
+    encrypted?: boolean;
     referenceTo?: string | null;
     minLength?: number | null;
     maxLength?: number | null;
@@ -38,6 +39,7 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
         type: z.enum(Object.values(AppFieldType)),
         isRequired: z.boolean().default(true).optional(),
         isKey: z.boolean().default(false).optional(),
+        encrypted: z.boolean().default(false).optional(),
 
         // Reference Constraints
         referenceTo: z.string().nullable().optional(),

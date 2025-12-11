@@ -41,7 +41,11 @@ export function zodFromField(field: AppField): z.ZodType {
             fld = z.enum((field.options as [string, ...string[]]) ?? []);
             break;
         case AppFieldType.JSON:
-            fld = zodFromFields(field.fields ?? []);
+            if (field.fields && field.fields.length > 0) {
+                fld = zodFromFields(field.fields);
+            } else {
+                fld = z.any();
+            }
             break;
         case AppFieldType.List:
             if (field.child) fld = z.array(zodFromField(field.child));

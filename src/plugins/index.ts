@@ -11,6 +11,7 @@ import dataPlugin from './dataPlugin.js';
 export type SchemaFXConnectorsOptions = {
     schemaConnector: string;
     connectors: Record<string, Connector>;
+    encryptionKey?: string;
     maxRecursiveDepth?: number;
     validatorCacheOpts?: {
         max?: number;
@@ -24,7 +25,14 @@ export type SchemaFXConnectorsOptions = {
 
 const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
     fastify,
-    { schemaConnector, connectors, maxRecursiveDepth, validatorCacheOpts, schemaCacheOpts }
+    {
+        schemaConnector,
+        connectors,
+        encryptionKey,
+        maxRecursiveDepth,
+        validatorCacheOpts,
+        schemaCacheOpts
+    }
 ) => {
     const validatorCache = new LRUCache<string, z.ZodType>({
         max: validatorCacheOpts?.max ?? 500,
@@ -80,7 +88,8 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         connectors,
         getSchema,
         validatorCache,
-        maxRecursiveDepth
+        maxRecursiveDepth,
+        encryptionKey
     });
 };
 

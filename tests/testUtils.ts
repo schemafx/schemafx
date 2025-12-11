@@ -5,7 +5,7 @@ import SchemaFX, {
     MemoryConnector
 } from '../src/index.js';
 
-export async function createTestApp(includeToken?: boolean) {
+export async function createTestApp(includeToken?: boolean, opts?: { encryptionKey?: string }) {
     const connector = new MemoryConnector('Memory', 'mem');
     const schema = {
         id: 'app1',
@@ -50,7 +50,8 @@ export async function createTestApp(includeToken?: boolean) {
             schemaConnector: 'mem',
             connectors: {
                 [connector.id]: connector
-            }
+            },
+            encryptionKey: opts?.encryptionKey
         }
     });
 

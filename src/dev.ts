@@ -12,7 +12,10 @@ const app = new SchemaFX({
         connectors: {
             memory: new MemoryConnector('Memory', 'memory'),
             file: new FileConnector('File System', dbPath, 'file')
-        }
+        },
+        encryptionKey:
+            process.env.ENCRYPTION_KEY ||
+            '1234567890123456789012345678901234567890123456789012345678901234'
     }
 });
 
