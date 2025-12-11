@@ -83,6 +83,214 @@ export function zodFromTable(table: AppTable, appId: string, cache: LRUCache<str
 }
 
 /**
+ * Generate an AppField definition from a Zod Schema.
+ * @param id ID of the field.
+ * @param schema Zod Schema.
+ * @returns AppField definition.
+ */
+export function fieldFromZod(id: string, schema: z.ZodType): AppField {
+    let type = AppFieldType.Text;
+    let isRequired = true;
+    let options: string[] | undefined;
+    let minValue: number | undefined;
+    let maxValue: number | undefined;
+    let minLength: number | undefined;
+    let maxLength: number | undefined;
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+    let fields: AppField[] | undefined;
+    let child: AppField | undefined;
+
+    let def: z.core.$ZodTypeDef = schema.def;
+    let currentSchema: z.ZodType = schema;
+
+    while (def.type === 'optional' || def.type === 'nullable' || def.type === 'default') {
+        if (def.type === 'optional' || def.type === 'nullable' || def.type === 'default') {
+            isRequired = false;
+        }
+
+        if ('innerType' in def) {
+            currentSchema = def.innerType as z.ZodType;
+            def = currentSchema.def;
+        } else if ('innerType' in currentSchema) {
+            currentSchema = currentSchema.innerType as z.ZodType;
+            def = currentSchema.def;
+        } else {
+            break;
+        }
+    }
+
+    switch (def.type) {
+        case 'string':
+            type = AppFieldType.Text;
+            if (def.checks) {
+                for (const check of def.checks) {
+                    const checkDef =
+                        'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
+
+                    if (checkDef) {
+                        if ((checkDef as z.core.$ZodCheckStringFormatDef).format === 'email') {
+                            type = AppFieldType.Email;
+                        }
+
+                        if (checkDef.check === 'min_length') {
+                            minLength = (checkDef as z.core.$ZodCheckMinLengthDef).minimum;
+                        }
+
+                        if (checkDef.check === 'max_length') {
+                            maxLength = (checkDef as z.core.$ZodCheckMaxLengthDef).maximum;
+                        }
+                    }
+                }
+            }
+            break;
+        case 'number':
+            type = AppFieldType.Number;
+            if (def.checks) {
+                for (const check of def.checks) {
+                    const checkDef =
+                        'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
+
+                    if (checkDef) {
+                        if (checkDef.check === 'greater_than') {
+                            minValue = (checkDef as z.core.$ZodCheckGreaterThanDef).value as number;
+                        }
+
+                        if (checkDef.check === 'less_than') {
+                            maxValue = (checkDef as z.core.$ZodCheckLessThanDef).value as number;
+                        }
+                    }
+                }
+            }
+            break;
+        case 'boolean':
+            type = AppFieldType.Boolean;
+            break;
+        case 'date':
+            type = AppFieldType.Date;
+            if (def.checks) {
+                for (const check of def.checks) {
+                    const checkDef =
+                        'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
+
+                    if (checkDef) {
+                        if (checkDef.check === 'greater_than') {
+                            startDate = new Date(
+                                (checkDef as z.core.$ZodCheckGreaterThanDef).value as number
+                            );
+                        }
+
+                        if (checkDef.check === 'less_than') {
+                            endDate = new Date(
+                                (checkDef as z.core.$ZodCheckLessThanDef).value as number
+                            );
+                        }
+                    }
+                }
+            }
+            break;
+        case 'enum':
+            type = AppFieldType.Dropdown;
+            if ((def as z.core.$ZodEnumDef).entries) {
+                options = Object.values((def as z.core.$ZodEnumDef).entries).map(v => v.toString());
+            }
+
+            break;
+        case 'array':
+            type = AppFieldType.List;
+            if ((currentSchema as z.ZodArray).element) {
+                child = fieldFromZod('child', (currentSchema as z.ZodArray).element as z.ZodType);
+            }
+
+            break;
+        case 'object':
+            type = AppFieldType.JSON;
+            if ((currentSchema as z.ZodObject).shape) {
+                fields = Object.entries((currentSchema as z.ZodObject).shape).map(([key, val]) =>
+                    fieldFromZod(key, val as z.ZodType)
+                );
+            }
+
+            break;
+        case 'record':
+        case 'tuple':
+        case 'map':
+        case 'set':
+        case 'intersection':
+        case 'union':
+            type = AppFieldType.JSON;
+            break;
+        default:
+            if (
+                ['any', 'unknown', 'void', 'undefined', 'null', 'symbol', 'nan', 'never'].includes(
+                    def.type
+                )
+            ) {
+                type = AppFieldType.JSON;
+            } else type = AppFieldType.JSON;
+
+            break;
+    }
+
+    return {
+        id,
+        name: id,
+        type,
+        isRequired,
+        options,
+        minValue,
+        maxValue,
+        minLength,
+        maxLength,
+        startDate,
+        endDate,
+        fields,
+        child
+    };
+}
+
+/**
+ * Generate an AppTable definition from a Zod Object Schema.
+ * @param schema Zod Object Schema.
+ * @param options Table Options.
+ * @returns AppTable definition.
+ */
+export function tableFromZod(
+    schema: z.ZodObject,
+    options: {
+        id: string;
+        name: string;
+        connector: string;
+        path?: string[];
+        primaryKey?: string;
+    }
+): AppTable {
+    const fields = Object.entries(schema.shape).map(([key, val]) =>
+        fieldFromZod(key, val as z.ZodType)
+    );
+
+    const primaryKey = options.primaryKey ?? 'id';
+    const keyField = fields.find(f => f.id === primaryKey);
+
+    if (!keyField) {
+        throw new Error(
+            `Table ${options.name} must have a primary key field matching '${primaryKey}'.`
+        );
+    }
+
+    keyField.isKey = true;
+
+    return {
+        id: options.id,
+        name: options.name,
+        connector: options.connector,
+        path: options.path ?? [],
+        fields,
+        actions: []
+    };
+}
+
+/**
  * Reorders elements within an array.
  * @param oldIndex Previous index.
  * @param newIndex New index.
