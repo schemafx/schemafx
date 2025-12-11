@@ -19,7 +19,7 @@ import type { Connector } from '../types.js';
 export type SchemaPluginOptions = {
     sConnector: Connector;
     schemaCache: LRUCache<string, AppSchema>;
-    validatorCache: LRUCache<string, z.ZodTypeAny>;
+    validatorCache: LRUCache<string, z.ZodAny>;
     getSchema: (appId: string) => Promise<AppSchema>;
 };
 
