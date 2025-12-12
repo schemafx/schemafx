@@ -7,17 +7,12 @@ import type { AppSchema } from '../types.js';
 import { randomUUID } from 'node:crypto';
 import type { LRUCache } from 'lru-cache';
 
-export type ConnectorsPluginOptions = {
+const plugin: FastifyPluginAsyncZod<{
     connectors: Record<string, Connector>;
     sConnector: Connector;
     schemaCache: LRUCache<string, AppSchema>;
     getSchema: (appId: string) => Promise<AppSchema>;
-};
-
-const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
-    fastify,
-    { connectors, sConnector, schemaCache, getSchema }
-) => {
+}> = async (fastify, { connectors, sConnector, schemaCache, getSchema }) => {
     const _connectors = Object.values(connectors).map(connector => ({
         id: connector.id,
         name: connector.name

@@ -11,15 +11,13 @@ import type { LRUCache } from 'lru-cache';
 import type { FastifyReply } from 'fastify';
 import { executeAction, handleDataRetriever } from '../utils/dataUtils.js';
 
-export type DataPluginOptions = {
+const plugin: FastifyPluginAsyncZod<{
     connectors: Record<string, Connector>;
     getSchema: (appId: string) => Promise<AppSchema>;
     validatorCache: LRUCache<string, z.ZodType>;
     maxRecursiveDepth?: number;
     encryptionKey?: string;
-};
-
-const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
+}> = async (
     fastify,
     { connectors, getSchema, validatorCache, maxRecursiveDepth, encryptionKey }
 ) => {

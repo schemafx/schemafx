@@ -16,17 +16,12 @@ import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
 import type { LRUCache } from 'lru-cache';
 import type { Connector } from '../types.js';
 
-export type SchemaPluginOptions = {
+const plugin: FastifyPluginAsyncZod<{
     sConnector: Connector;
     schemaCache: LRUCache<string, AppSchema>;
     validatorCache: LRUCache<string, z.ZodType>;
     getSchema: (appId: string) => Promise<AppSchema>;
-};
-
-const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
-    fastify,
-    { sConnector, schemaCache, validatorCache, getSchema }
-) => {
+}> = async (fastify, { sConnector, schemaCache, validatorCache, getSchema }) => {
     fastify.get(
         '/apps/:appId/schema',
         {
