@@ -1,19 +1,16 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { type Connector, AppSchemaSchema, ConnectorTableSchema } from '../types.js';
+import { AppSchemaSchema, ConnectorTableSchema } from '../types.js';
 import { validateTableKeys } from '../utils/schemaUtils.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
 import { randomUUID } from 'node:crypto';
-import type { LRUCache } from 'lru-cache';
+import type DataService from '../services/DataService.js';
 
 const plugin: FastifyPluginAsyncZod<{
-    connectors: Record<string, Connector>;
-    sConnector: Connector;
-    schemaCache: LRUCache<string, AppSchema>;
-    getSchema: (appId: string) => Promise<AppSchema>;
-}> = async (fastify, { connectors, sConnector, schemaCache, getSchema }) => {
-    const _connectors = Object.values(connectors).map(connector => ({
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
+    const _connectors = Object.values(dataService.connectors).map(connector => ({
         id: connector.id,
         name: connector.name
     }));
@@ -58,7 +55,7 @@ const plugin: FastifyPluginAsyncZod<{
             }
         },
         async (request, reply) => {
-            const connector = connectors[request.params.connectorName];
+            const connector = dataService.connectors[request.params.connectorName];
 
             if (!connector) {
                 return reply.code(404).send({
@@ -95,7 +92,7 @@ const plugin: FastifyPluginAsyncZod<{
             }
         },
         async (request, reply) => {
-            const connector = connectors[request.params.connectorName];
+            const connector = dataService.connectors[request.params.connectorName];
 
             if (!connector) {
                 return reply.code(404).send({
@@ -110,7 +107,7 @@ const plugin: FastifyPluginAsyncZod<{
 
             let schema: AppSchema;
             if (appId) {
-                schema = await getSchema(appId);
+                schema = await dataService.getSchema(appId);
 
                 if (!schema) {
                     return reply.code(404).send({
@@ -129,8 +126,7 @@ const plugin: FastifyPluginAsyncZod<{
                 };
             }
 
-            schemaCache.delete(schema.id);
-            return sConnector.saveSchema!(schema.id, schema);
+            return dataService.setSchema(schema.id, schema);
         }
     );
 };

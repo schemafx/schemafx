@@ -24,8 +24,9 @@ import fastifySwagger, { type SwaggerOptions } from '@fastify/swagger';
 import fastifySwaggerUi, { type FastifySwaggerUiOptions } from '@fastify/swagger-ui';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import connectorHandler, { type SchemaFXConnectorsOptions } from './plugins/index.js';
+import connectorHandler from './plugins/index.js';
 import { ZodError } from 'zod';
+import DataService, { type DataServiceOptions } from './services/DataService.js';
 
 export type SchemaFXOptions = {
     fastifyOpts?: FastifyServerOptions;
@@ -37,7 +38,7 @@ export type SchemaFXOptions = {
     swaggerOpts?: SwaggerOptions;
     swaggerUiOpts?: FastifySwaggerUiOptions;
     jwtOpts: FastifyJWTOptions;
-    connectorOpts: SchemaFXConnectorsOptions;
+    dataServiceOpts: DataServiceOptions;
 };
 
 export default class SchemaFX {
@@ -48,6 +49,8 @@ export default class SchemaFX {
         FastifyBaseLogger,
         ZodTypeProvider
     >;
+
+    dataService: DataService;
 
     constructor(opts: SchemaFXOptions) {
         this.fastifyInstance = fastify(opts.fastifyOpts).withTypeProvider<ZodTypeProvider>();
@@ -150,9 +153,10 @@ export default class SchemaFX {
             this.fastifyInstance.swagger({ yaml: true })
         );
 
+        this.dataService = new DataService(opts.dataServiceOpts);
         this.fastifyInstance.register(connectorHandler, {
             prefix: '/api',
-            ...opts.connectorOpts
+            dataService: this.dataService
         });
     }
 

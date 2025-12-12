@@ -39,23 +39,26 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
         views: []
     } as AppSchema;
 
-    await connector.saveSchema!('app1', schema);
-    await connector.addRow!(schema.tables[0], { id: 1, name: 'User 1' });
-
     const app = new SchemaFX({
         jwtOpts: {
             secret: 'test-secret'
         },
-        connectorOpts: {
+        dataServiceOpts: {
             schemaConnector: {
                 connector: 'mem',
                 path: ['schemas']
             },
-            connectors: {
-                [connector.id]: connector
-            },
+            connectors: [connector],
             encryptionKey: opts?.encryptionKey
         }
+    });
+
+    await app.dataService.setSchema('app1', schema);
+    await app.dataService.executeAction({
+        appId: schema.id,
+        table: schema.tables[0],
+        actId: 'add',
+        rows: [{ id: 1, name: 'User 1' }]
     });
 
     return {

@@ -1,28 +1,15 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import {
-    type AppSchema,
-    AppTableRowSchema,
-    type Connector,
-    TableQueryOptionsSchema
-} from '../types.js';
+import { AppTableRowSchema, TableQueryOptionsSchema } from '../types.js';
 import { tableQuerySchema } from '../utils/fastifyUtils.js';
-import type { LRUCache } from 'lru-cache';
 import type { FastifyReply } from 'fastify';
-import { executeAction, handleDataRetriever } from '../utils/dataUtils.js';
+import type DataService from '../services/DataService.js';
 
 const plugin: FastifyPluginAsyncZod<{
-    connectors: Record<string, Connector>;
-    getSchema: (appId: string) => Promise<AppSchema>;
-    validatorCache: LRUCache<string, z.ZodType>;
-    maxRecursiveDepth?: number;
-    encryptionKey?: string;
-}> = async (
-    fastify,
-    { connectors, getSchema, validatorCache, maxRecursiveDepth, encryptionKey }
-) => {
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
     async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
-        const schema = await getSchema(appId);
+        const schema = await dataService.getSchema(appId);
         const table = schema.tables.find(table => table.id === tableId);
 
         if (!table) {
@@ -37,7 +24,7 @@ const plugin: FastifyPluginAsyncZod<{
         }
 
         const connectorName = table.connector;
-        const connector = connectors[connectorName];
+        const connector = dataService.connectors[connectorName];
 
         if (!connector) {
             return {
@@ -62,7 +49,7 @@ const plugin: FastifyPluginAsyncZod<{
             schema: tableQuerySchema
         },
         async (request, reply) => {
-            const { response, success, connector, table } = await handleTable(
+            const { response, success, table } = await handleTable(
                 request.params.appId,
                 request.params.tableId,
                 reply
@@ -77,7 +64,7 @@ const plugin: FastifyPluginAsyncZod<{
                 query = parsed;
             }
 
-            return handleDataRetriever(table, connector, query, encryptionKey);
+            return dataService.getData(table, query);
         }
     );
 
@@ -112,19 +99,14 @@ const plugin: FastifyPluginAsyncZod<{
 
             if (!success || !table || !connector) return response;
 
-            await executeAction({
-                connector,
+            await dataService.executeAction({
                 table,
                 actId: actionId,
-                currentRows: rows,
-                depth: 0,
-                maxDepth: maxRecursiveDepth ?? 100,
-                appId,
-                validatorCache,
-                encryptionKey
+                rows,
+                appId
             });
 
-            return handleDataRetriever(table, connector, undefined, encryptionKey);
+            return dataService.getData(table);
         }
     );
 };

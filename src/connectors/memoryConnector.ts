@@ -1,4 +1,3 @@
-import mock_data from './mock_data.json' with { type: 'json' };
 import {
     Connector,
     type AppSchema,
@@ -34,26 +33,6 @@ export default class MemoryConnector extends Connector {
         // In-Memory capabilities only.
         // Default capability handler.
         return {};
-    }
-
-    async getSchema(appId: string) {
-        let schema = this.schemas.get(appId);
-
-        if (!schema) {
-            schema = { ...mock_data } as unknown as AppSchema;
-            await this.saveSchema(appId, schema);
-        }
-
-        return schema;
-    }
-
-    async saveSchema(appId: string, schema: AppSchema) {
-        this.schemas.set(appId, schema);
-        return schema;
-    }
-
-    async deleteSchema(appId: string) {
-        this.schemas.delete(appId);
     }
 
     async getData(table: AppTable) {

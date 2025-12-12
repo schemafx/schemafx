@@ -7,7 +7,6 @@ import {
     ConnectorTableCapability
 } from '../types.js';
 import inferTable from '../utils/inferTable.js';
-import mock_data from './mock_data.json' with { type: 'json' };
 
 type FileDB = {
     schemas: Record<string, AppSchema>;
@@ -67,32 +66,6 @@ export default class FileConnector extends Connector {
 
     private async _writeDB(db: FileDB) {
         await writeFile(this.filePath, JSON.stringify(db, null, 4), 'utf-8');
-    }
-
-    async getSchema(appId: string) {
-        const db = await this._readDB();
-        let schema = db.schemas[appId];
-
-        if (!schema) {
-            schema = { ...mock_data } as unknown as AppSchema;
-            db.schemas[appId] = schema;
-            await this._writeDB(db);
-        }
-
-        return schema;
-    }
-
-    async saveSchema(appId: string, schema: AppSchema) {
-        const db = await this._readDB();
-        db.schemas[appId] = schema;
-        await this._writeDB(db);
-        return schema;
-    }
-
-    async deleteSchema(appId: string) {
-        const db = await this._readDB();
-        delete db.schemas[appId];
-        await this._writeDB(db);
     }
 
     async getData(table: AppTable) {

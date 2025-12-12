@@ -197,30 +197,6 @@ export abstract class Connector {
     getCapabilities?(table: AppTable): Promise<ConnectorCapabilities>;
 
     /**
-     * Retrieve a Schema.
-     * @param appId Id of the Application.
-     * @param table Table Schema.
-     * @returns Application Schema.
-     */
-    getSchema?(appId: string, table?: AppTable): Promise<AppSchema>;
-
-    /**
-     * Save an updated Schema.
-     * @param appId Id of the Application.
-     * @param schema Updated Schema to save.
-     * @param table Table Schema.
-     * @returns Application Schema.
-     */
-    saveSchema?(appId: string, schema: AppSchema, table?: AppTable): Promise<AppSchema>;
-
-    /**
-     * Delete the Schema for an Application.
-     * @param appId Id of the Application.
-     * @param table Table Schema.
-     */
-    deleteSchema?(appId: string, table?: AppTable): Promise<void>;
-
-    /**
      * Get data from a Table.
      * @param table Table.
      * @param query Query Options.

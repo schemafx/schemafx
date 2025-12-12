@@ -6,12 +6,12 @@ describe('Core SchemaFX', () => {
     it('should initialize with default options', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
 
@@ -22,12 +22,12 @@ describe('Core SchemaFX', () => {
     it('should initialize with custom options', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             },
             corsOpts: { origin: false },
             rateLimitOpts: { max: 50 },
@@ -51,12 +51,12 @@ describe('Core SchemaFX', () => {
     it('should access the logger via the getter', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
 
@@ -71,12 +71,12 @@ describe('Core SchemaFX', () => {
     it('should handle listen', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
 
@@ -88,12 +88,12 @@ describe('Core SchemaFX', () => {
     it('should handle listen with callback', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
 
@@ -111,12 +111,12 @@ describe('Core SchemaFX', () => {
     it('should handle SyntaxError (manually thrown)', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
 
@@ -144,12 +144,12 @@ describe('Core SchemaFX', () => {
     it('should handle unexpected errors', async () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
                 },
-                connectors: { mem: new MemoryConnector('Mem', 'mem') }
+                connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
 

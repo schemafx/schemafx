@@ -93,22 +93,19 @@ describe('DuckDB Integration Benchmark', () => {
 
         app = new SchemaFX({
             jwtOpts: { secret: 'supersecret' },
-            connectorOpts: {
+            dataServiceOpts: {
                 schemaConnector: {
                     connector: memConnector.id,
                     path: ['schemas']
                 },
-                connectors: {
-                    [memConnector.id]: memConnector,
-                    [benchConnector.id]: benchConnector
-                }
+                connectors: [memConnector, benchConnector]
             }
         });
 
         await app.fastifyInstance.ready();
         token = app.fastifyInstance.jwt.sign({ sub: 'user1' });
 
-        await memConnector.saveSchema(schemaId, {
+        await app.dataService.setSchema(schemaId, {
             id: schemaId,
             name: 'Benchmark App',
             tables: [

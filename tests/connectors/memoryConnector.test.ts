@@ -15,31 +15,6 @@ describe('MemoryConnector', () => {
         expect(connector.id).toBe(connectorId);
     });
 
-    it('should save and get schema', async () => {
-        const schema = {
-            id: 'app1',
-            name: 'App 1',
-            tables: [],
-            views: []
-        };
-
-        await connector.saveSchema!('app1', schema);
-        const result = await connector.getSchema!('app1');
-        expect(result).toEqual(schema);
-    });
-
-    // Current API adds mock data by default.
-    /*it('should throw when getting non-existent schema', async () => {
-        await expect(connector.getSchema!('unknown')).rejects.toThrow();
-    });
-
-    it('should delete schema', async () => {
-        const schema = { id: 'app1', name: 'App 1', tables: [], views: [] };
-        await connector.saveSchema!('app1', schema);
-        await connector.deleteSchema!('app1');
-        await expect(connector.getSchema!('app1')).rejects.toThrow();
-    });*/
-
     describe('Data Operations', () => {
         const table: AppTable = {
             id: 'users',

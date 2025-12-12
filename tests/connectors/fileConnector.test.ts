@@ -30,35 +30,6 @@ describe('FileConnector', () => {
         expect(connector.id).toBe(connectorId);
     });
 
-    it('should save and get schema', async () => {
-        const schema = {
-            id: 'app1',
-            name: 'App 1',
-            tables: [],
-            views: []
-        };
-
-        await connector.saveSchema!('app1', schema);
-
-        const content = JSON.parse(await readFile(TEST_DB_PATH, 'utf-8'));
-        expect(content.schemas.app1).toBeDefined();
-
-        const result = await connector.getSchema!('app1');
-        expect(result).toEqual(schema);
-    });
-
-    it('should delete schema', async () => {
-        const schema = { id: 'app1', name: 'App 1', tables: [], views: [] };
-        await connector.saveSchema!('app1', schema);
-        await connector.deleteSchema!('app1');
-
-        const content = JSON.parse(await readFile(TEST_DB_PATH, 'utf-8'));
-        expect(content.schemas.app1).toBeUndefined();
-
-        // Current API adds mock data by default.
-        // await expect(connector.getSchema!('app1')).rejects.toThrow();
-    });
-
     describe('Data Operations', () => {
         const table: AppTable = {
             id: 'users',

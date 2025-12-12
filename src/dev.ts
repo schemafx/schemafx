@@ -9,15 +9,12 @@ const app = new SchemaFX({
     jwtOpts: {
         secret: 'my-very-secret'
     },
-    connectorOpts: {
+    dataServiceOpts: {
         schemaConnector: {
             connector: fileConnector.id,
             path: ['schemas']
         },
-        connectors: {
-            [memoryConnector.id]: memoryConnector,
-            [fileConnector.id]: fileConnector
-        },
+        connectors: [memoryConnector, fileConnector],
         encryptionKey:
             process.env.ENCRYPTION_KEY ||
             '1234567890123456789012345678901234567890123456789012345678901234'

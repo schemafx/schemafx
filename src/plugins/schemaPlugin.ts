@@ -1,7 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
-    type AppSchema,
     AppSchemaSchema,
     type AppTable,
     type AppView,
@@ -13,15 +12,11 @@ import {
     AppActionSchema
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
-import type { LRUCache } from 'lru-cache';
-import type { Connector } from '../types.js';
+import type DataService from '../services/DataService.js';
 
 const plugin: FastifyPluginAsyncZod<{
-    sConnector: Connector;
-    schemaCache: LRUCache<string, AppSchema>;
-    validatorCache: LRUCache<string, z.ZodType>;
-    getSchema: (appId: string) => Promise<AppSchema>;
-}> = async (fastify, { sConnector, schemaCache, validatorCache, getSchema }) => {
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
     fastify.get(
         '/apps/:appId/schema',
         {
@@ -31,7 +26,7 @@ const plugin: FastifyPluginAsyncZod<{
                 response: { 200: AppSchemaSchema }
             }
         },
-        request => getSchema(request.params.appId)
+        request => dataService.getSchema(request.params.appId)
     );
 
     fastify.post(
@@ -103,7 +98,7 @@ const plugin: FastifyPluginAsyncZod<{
         },
         async request => {
             const { appId } = request.params;
-            const schema = await getSchema(appId);
+            const schema = await dataService.getSchema(appId);
 
             switch (request.body.action) {
                 case 'add':
@@ -136,7 +131,7 @@ const plugin: FastifyPluginAsyncZod<{
                         schema.tables = schema.tables.map(table => {
                             if (table.id === addEl.parentId) {
                                 table.fields.push(addEl.element as AppField);
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                             }
 
                             return table;
@@ -151,8 +146,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(appId, schema);
                 case 'update':
                     const updateEl = request.body.element;
 
@@ -160,7 +154,7 @@ const plugin: FastifyPluginAsyncZod<{
                         validateTableKeys(updateEl.element as AppTable);
                         schema.tables = schema.tables.map(table => {
                             if (table.id === updateEl.element.id) {
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 return updateEl.element as AppTable;
                             }
 
@@ -185,7 +179,7 @@ const plugin: FastifyPluginAsyncZod<{
                                     );
                                 }
 
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = updatedFields;
                             }
 
@@ -205,15 +199,14 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(appId, schema);
                 case 'delete':
                     const delEl = request.body.element;
 
                     if (delEl.partOf === 'tables') {
                         schema.tables = schema.tables.filter(table => {
                             if (table.id === delEl.elementId) {
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 return false;
                             }
 
@@ -245,7 +238,7 @@ const plugin: FastifyPluginAsyncZod<{
                                     );
                                 }
 
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = remainingFields;
                             }
 
@@ -263,8 +256,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(appId, schema);
                 case 'reorder':
                     const reoEl = request.body.element;
                     const { oldIndex, newIndex } = request.body;
@@ -291,11 +283,10 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(appId, schema);
             }
 
-            return getSchema(request.params.appId);
+            return dataService.getSchema(request.params.appId);
         }
     );
 };

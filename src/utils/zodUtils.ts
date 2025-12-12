@@ -116,17 +116,17 @@ export function fieldFromZod(id: string, schema: z.ZodType): AppField {
 
     switch (def.type) {
         case 'string':
-            type = AppFieldType.Text;
+            type =
+                (def as z.core.$ZodEmailDef).format === 'email'
+                    ? AppFieldType.Email
+                    : AppFieldType.Text;
+
             if (def.checks) {
                 for (const check of def.checks) {
                     const checkDef =
                         'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
 
                     if (checkDef) {
-                        if ((checkDef as z.core.$ZodCheckStringFormatDef).format === 'email') {
-                            type = AppFieldType.Email;
-                        }
-
                         if (checkDef.check === 'min_length') {
                             minLength = (checkDef as z.core.$ZodCheckMinLengthDef).minimum;
                         }
