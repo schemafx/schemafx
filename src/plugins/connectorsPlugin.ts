@@ -1,10 +1,11 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { type Connector, AppSchemaSchema, ConnectorTableSchema } from '../types.js';
-import { validateTableKeys, ErrorResponseSchema } from '../utils/schemaUtils.js';
+import { validateTableKeys } from '../utils/schemaUtils.js';
+import { ErrorResponseSchema } from '../utils/zodUtils.js';
 import type { AppSchema } from '../types.js';
 import { randomUUID } from 'node:crypto';
-import { LRUCache } from 'lru-cache';
+import type { LRUCache } from 'lru-cache';
 
 export type ConnectorsPluginOptions = {
     connectors: Record<string, Connector>;

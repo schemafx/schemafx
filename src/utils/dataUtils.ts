@@ -8,7 +8,7 @@ import {
     type TableQueryOptions
 } from '../types.js';
 import { decrypt, encrypt } from './encryption.js';
-import { extractKeys, zodFromTable } from './schemaUtils.js';
+import { extractKeys } from './schemaUtils.js';
 import type { LRUCache } from 'lru-cache';
 import knex from 'knex';
 import {
@@ -18,6 +18,7 @@ import {
     ingestStreamToDuckDB
 } from './duckdb.js';
 import type { DuckDBValue } from '@duckdb/node-api';
+import { zodFromTable } from './zodUtils.js';
 
 const qb = knex({ client: 'pg' });
 

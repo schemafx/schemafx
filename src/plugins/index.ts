@@ -7,7 +7,7 @@ import authPlugin from './authPlugin.js';
 import connectorsPlugin from './connectorsPlugin.js';
 import schemaPlugin from './schemaPlugin.js';
 import dataPlugin from './dataPlugin.js';
-import { type AppTableFromZodOptions, tableFromZod } from '../utils/schemaUtils.js';
+import { type AppTableFromZodOptions, tableFromZod } from '../utils/zodUtils.js';
 
 export type SchemaFXConnectorsOptions = {
     schemaConnector: Omit<AppTableFromZodOptions, 'id' | 'name' | 'primaryKey'>;

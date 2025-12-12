@@ -6,8 +6,8 @@ import {
     type Connector,
     TableQueryOptionsSchema
 } from '../types.js';
-import { tableQuerySchema } from '../utils/schemaUtils.js';
-import { LRUCache } from 'lru-cache';
+import { tableQuerySchema } from '../utils/zodUtils.js';
+import type { LRUCache } from 'lru-cache';
 import type { FastifyReply } from 'fastify';
 import { executeAction, handleDataRetriever } from '../utils/dataUtils.js';
 

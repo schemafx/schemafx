@@ -13,7 +13,7 @@ import {
     AppActionSchema
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
-import { LRUCache } from 'lru-cache';
+import type { LRUCache } from 'lru-cache';
 import type { Connector } from '../types.js';
 
 export type SchemaPluginOptions = {

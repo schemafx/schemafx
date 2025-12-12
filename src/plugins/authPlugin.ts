@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { ErrorResponseSchema } from '../utils/schemaUtils.js';
+import { ErrorResponseSchema } from '../utils/zodUtils.js';
 
 const plugin: FastifyPluginAsyncZod = async fastify => {
     fastify.post(
