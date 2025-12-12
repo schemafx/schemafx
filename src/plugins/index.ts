@@ -1,5 +1,5 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
-import type { AppSchema, Connector } from '../types.js';
+import { AppSchemaSchema, type AppSchema, type Connector } from '../types.js';
 import { z } from 'zod';
 import { LRUCache } from 'lru-cache';
 
@@ -7,9 +7,10 @@ import authPlugin from './authPlugin.js';
 import connectorsPlugin from './connectorsPlugin.js';
 import schemaPlugin from './schemaPlugin.js';
 import dataPlugin from './dataPlugin.js';
+import { type AppTableFromZodOptions, tableFromZod } from '../utils/schemaUtils.js';
 
 export type SchemaFXConnectorsOptions = {
-    schemaConnector: string;
+    schemaConnector: Omit<AppTableFromZodOptions, 'id' | 'name' | 'primaryKey'>;
     connectors: Record<string, Connector>;
     encryptionKey?: string;
     maxRecursiveDepth?: number;
@@ -44,22 +45,35 @@ const plugin: FastifyPluginAsyncZod<SchemaFXConnectorsOptions> = async (
         ttl: schemaCacheOpts?.ttl ?? 1000 * 60 * 5 // 5 minutes TTL
     });
 
-    const sConnector = connectors[schemaConnector];
+    const sConnector = connectors[schemaConnector.connector];
 
     if (!sConnector) {
-        throw new Error(`Unrecognized connector "${schemaConnector}".`);
+        throw new Error(`Unrecognized connector "${schemaConnector.connector}".`);
     } else if (!sConnector.getSchema) {
-        throw new Error(`Missing implementation "getSchema" on connector "${schemaConnector}".`);
+        throw new Error(
+            `Missing implementation "getSchema" on connector "${schemaConnector.connector}".`
+        );
     } else if (!sConnector.saveSchema) {
-        throw new Error(`Missing implementation "saveSchema" on connector "${schemaConnector}".`);
+        throw new Error(
+            `Missing implementation "saveSchema" on connector "${schemaConnector.connector}".`
+        );
     } else if (!sConnector.deleteSchema) {
-        throw new Error(`Missing implementation "deleteSchema" on connector "${schemaConnector}".`);
+        throw new Error(
+            `Missing implementation "deleteSchema" on connector "${schemaConnector.connector}".`
+        );
     }
+
+    const schemaTable = tableFromZod(AppSchemaSchema, {
+        id: '',
+        name: '',
+        primaryKey: 'id',
+        ...schemaConnector
+    });
 
     async function getSchema(appId: string) {
         if (schemaCache.has(appId)) return schemaCache.get(appId)!;
 
-        const schema = await sConnector.getSchema!(appId);
+        const schema = await sConnector.getSchema!(appId, schemaTable);
         schemaCache.set(appId, schema);
         return schema;
     }

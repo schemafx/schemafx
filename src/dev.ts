@@ -3,15 +3,20 @@ import path from 'path';
 
 const dbPath = path.join(process.cwd(), 'database.json');
 
+const memoryConnector = new MemoryConnector('Memory', 'memory');
+const fileConnector = new FileConnector('File System', dbPath, 'file');
 const app = new SchemaFX({
     jwtOpts: {
         secret: 'my-very-secret'
     },
     connectorOpts: {
-        schemaConnector: 'file',
+        schemaConnector: {
+            connector: fileConnector.id,
+            path: ['schemas']
+        },
         connectors: {
-            memory: new MemoryConnector('Memory', 'memory'),
-            file: new FileConnector('File System', dbPath, 'file')
+            [memoryConnector.id]: memoryConnector,
+            [fileConnector.id]: fileConnector
         },
         encryptionKey:
             process.env.ENCRYPTION_KEY ||

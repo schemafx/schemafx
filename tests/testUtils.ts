@@ -47,7 +47,10 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
             secret: 'test-secret'
         },
         connectorOpts: {
-            schemaConnector: 'mem',
+            schemaConnector: {
+                connector: 'mem',
+                path: ['schemas']
+            },
             connectors: {
                 [connector.id]: connector
             },

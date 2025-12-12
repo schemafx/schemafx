@@ -7,7 +7,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             }
         });
@@ -20,7 +23,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             },
             corsOpts: { origin: false },
@@ -46,7 +52,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             }
         });
@@ -63,7 +72,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             }
         });
@@ -77,7 +89,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             }
         });
@@ -97,7 +112,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             }
         });
@@ -127,7 +145,10 @@ describe('Core SchemaFX', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: 'mem',
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
                 connectors: { mem: new MemoryConnector('Mem', 'mem') }
             }
         });

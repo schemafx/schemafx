@@ -94,7 +94,10 @@ describe('DuckDB Integration Benchmark', () => {
         app = new SchemaFX({
             jwtOpts: { secret: 'supersecret' },
             connectorOpts: {
-                schemaConnector: memConnector.id,
+                schemaConnector: {
+                    connector: memConnector.id,
+                    path: ['schemas']
+                },
                 connectors: {
                     [memConnector.id]: memConnector,
                     [benchConnector.id]: benchConnector

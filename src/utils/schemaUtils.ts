@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { LRUCache } from 'lru-cache';
-import { type AppField, AppFieldType, type AppTable, type AppTableRow } from '../types.js';
+import {
+    type AppAction,
+    type AppField,
+    AppFieldType,
+    type AppTable,
+    type AppTableRow
+} from '../types.js';
 
 /**
  * Standard error response schema.
@@ -253,22 +259,22 @@ export function fieldFromZod(id: string, schema: z.ZodType): AppField {
     };
 }
 
+export type AppTableFromZodOptions = {
+    id: string;
+    name: string;
+    connector: string;
+    path: string[];
+    primaryKey: string;
+    actions?: AppAction[];
+};
+
 /**
  * Generate an AppTable definition from a Zod Object Schema.
  * @param schema Zod Object Schema.
  * @param options Table Options.
  * @returns AppTable definition.
  */
-export function tableFromZod(
-    schema: z.ZodObject,
-    options: {
-        id: string;
-        name: string;
-        connector: string;
-        path?: string[];
-        primaryKey?: string;
-    }
-): AppTable {
+export function tableFromZod(schema: z.ZodObject, options: AppTableFromZodOptions): AppTable {
     const fields = Object.entries(schema.shape).map(([key, val]) =>
         fieldFromZod(key, val as z.ZodType)
     );
@@ -288,9 +294,9 @@ export function tableFromZod(
         id: options.id,
         name: options.name,
         connector: options.connector,
-        path: options.path ?? [],
+        path: options.path,
         fields,
-        actions: []
+        actions: options.actions ?? []
     };
 }
 

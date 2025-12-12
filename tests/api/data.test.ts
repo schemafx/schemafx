@@ -388,7 +388,10 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
             connectorOpts: {
-                schemaConnector: memConnector.id,
+                schemaConnector: {
+                    connector: memConnector.id,
+                    path: ['schemas']
+                },
                 connectors: {
                     mem: memConnector,
                     limited: limitedConnector
