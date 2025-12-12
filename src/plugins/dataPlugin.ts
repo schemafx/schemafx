@@ -2,28 +2,14 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
     type AppSchema,
-    type AppTableRow,
     AppTableRowSchema,
-    TableQueryOptionsSchema,
-    AppActionType,
     type Connector,
-    type AppTable,
-    AppFieldType
+    TableQueryOptionsSchema
 } from '../types.js';
-import { encrypt, decrypt } from '../utils/encryption.js';
-import { zodFromTable, extractKeys, tableQuerySchema } from '../utils/schemaUtils.js';
-import {
-    createDuckDBInstance,
-    ingestStreamToDuckDB,
-    buildSQLQuery,
-    ingestDataToDuckDB
-} from '../utils/duckdb.js';
+import { tableQuerySchema } from '../utils/schemaUtils.js';
 import { LRUCache } from 'lru-cache';
 import type { FastifyReply } from 'fastify';
-import type { DuckDBValue } from '@duckdb/node-api';
-import knex from 'knex';
-
-const qb = knex({ client: 'pg' });
+import { executeAction, handleDataRetriever } from '../utils/dataUtils.js';
 
 export type DataPluginOptions = {
     connectors: Record<string, Connector>;
@@ -33,66 +19,10 @@ export type DataPluginOptions = {
     encryptionKey?: string;
 };
 
-function encodeRow(
-    row: Record<string, unknown>,
-    table: AppTable,
-    encryptionKey?: string
-): Record<string, unknown> {
-    if (!encryptionKey) return row;
-    const processedRow = { ...row };
-
-    for (const field of table.fields) {
-        if (
-            field.encrypted &&
-            (field.type === AppFieldType.Text || field.type === AppFieldType.JSON) &&
-            processedRow[field.id] !== undefined &&
-            processedRow[field.id] !== null
-        ) {
-            let valueToEncrypt = processedRow[field.id];
-            if (field.type === AppFieldType.JSON) valueToEncrypt = JSON.stringify(valueToEncrypt);
-
-            processedRow[field.id] = encrypt(String(valueToEncrypt), encryptionKey);
-        }
-    }
-
-    return processedRow;
-}
-
-function decodeRow(
-    row: Record<string, unknown>,
-    table: AppTable,
-    encryptionKey?: string
-): Record<string, unknown> {
-    if (!encryptionKey) return row;
-    const processedRow = { ...row };
-
-    for (const field of table.fields) {
-        let value = processedRow[field.id];
-
-        if (
-            field.encrypted &&
-            value !== undefined &&
-            value !== null &&
-            typeof value === 'string' &&
-            (field.type === AppFieldType.Text || field.type === AppFieldType.JSON)
-        ) {
-            const decrypted = decrypt(value, encryptionKey);
-            if (field.type === AppFieldType.JSON) value = JSON.parse(decrypted);
-            else value = decrypted;
-
-            processedRow[field.id] = value;
-        }
-    }
-
-    return processedRow;
-}
-
 const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
     fastify,
     { connectors, getSchema, validatorCache, maxRecursiveDepth, encryptionKey }
 ) => {
-    const MAX_DEPTH = maxRecursiveDepth ?? 100;
-
     async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
         const schema = await getSchema(appId);
         const table = schema.tables.find(table => table.id === tableId);
@@ -127,55 +57,6 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
         return { schema, table, connectorName, connector, success: true };
     }
 
-    async function handleDataRetriever(table: AppTable, connector: Connector, queryStr?: string) {
-        let query;
-        if (queryStr) {
-            query = JSON.parse(queryStr);
-            const parsed = await TableQueryOptionsSchema.parseAsync(query);
-            query = parsed;
-        }
-
-        if (!connector.getData && !connector.getDataStream) return [];
-
-        const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
-        const dbInstance = await createDuckDBInstance();
-        const connection = await dbInstance.connect();
-
-        if (connector.getDataStream) {
-            await ingestStreamToDuckDB(
-                connection,
-                await connector.getDataStream(table),
-                table,
-                tempTableName
-            );
-        } else {
-            await ingestDataToDuckDB(
-                connection,
-                await connector.getData!(table),
-                table,
-                tempTableName
-            );
-        }
-
-        const { sql, params } = buildSQLQuery(tempTableName, query || {});
-        const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
-        const rows = await reader.getRows();
-
-        const result = rows.map(row => {
-            const obj: Record<string, unknown> = {};
-            table.fields.forEach((field, index) => {
-                obj[field.id] = row[index];
-            });
-
-            return decodeRow(obj, table, encryptionKey);
-        });
-
-        await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
-        connection.closeSync();
-
-        return result;
-    }
-
     fastify.get(
         '/apps/:appId/data/:tableId',
         {
@@ -191,7 +72,14 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
 
             if (!success || !table) return response;
 
-            return handleDataRetriever(table, connector, request.query.query);
+            let query;
+            if (request.query.query) {
+                query = JSON.parse(request.query.query);
+                const parsed = await TableQueryOptionsSchema.parseAsync(query);
+                query = parsed;
+            }
+
+            return handleDataRetriever(table, connector, query, encryptionKey);
         }
     );
 
@@ -226,75 +114,19 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
 
             if (!success || !table || !connector) return response;
 
-            const keyFields = table.fields.filter(f => f.isKey).map(f => f.id);
+            await executeAction({
+                connector,
+                table,
+                actId: actionId,
+                currentRows: rows,
+                depth: 0,
+                maxDepth: maxRecursiveDepth ?? 100,
+                appId,
+                validatorCache,
+                encryptionKey
+            });
 
-            async function executeAction(actId: string, currentRows: AppTableRow[], depth: number) {
-                if (depth > MAX_DEPTH) {
-                    throw new Error('Max recursion depth exceeded.');
-                }
-
-                const action = table!.actions?.find(a => a.id === actId);
-                if (!action) throw new Error(`Action ${actId} not found.`);
-
-                switch (action.type) {
-                    case AppActionType.Add: {
-                        const validator = zodFromTable(table!, appId, validatorCache);
-                        for (const row of currentRows) {
-                            await connector?.addRow?.(
-                                table,
-                                encodeRow(
-                                    (await validator.parseAsync(row)) as Record<string, unknown>,
-                                    table!,
-                                    encryptionKey
-                                )
-                            );
-                        }
-
-                        return;
-                    }
-                    case AppActionType.Update: {
-                        const validator = zodFromTable(table!, appId, validatorCache);
-                        for (const row of currentRows) {
-                            const key = extractKeys(row, keyFields);
-                            if (Object.keys(key).length === 0) continue;
-
-                            await connector?.updateRow?.(
-                                table,
-                                key,
-                                encodeRow(
-                                    (await validator.parseAsync(row)) as Record<string, unknown>,
-                                    table!,
-                                    encryptionKey
-                                )
-                            );
-                        }
-
-                        return;
-                    }
-                    case AppActionType.Delete: {
-                        for (const row of currentRows) {
-                            const key = extractKeys(row, keyFields);
-                            if (Object.keys(key).length === 0) continue;
-
-                            await connector?.deleteRow?.(table, key);
-                        }
-
-                        return;
-                    }
-                    case AppActionType.Process: {
-                        const subActions = (action.config?.actions as string[]) || [];
-
-                        for (const subActionId of subActions) {
-                            await executeAction(subActionId, currentRows, depth + 1);
-                        }
-
-                        return;
-                    }
-                }
-            }
-
-            await executeAction(actionId, rows, 0);
-            return handleDataRetriever(table, connector);
+            return handleDataRetriever(table, connector, undefined, encryptionKey);
         }
     );
 };
