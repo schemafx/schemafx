@@ -13,6 +13,7 @@ import {
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
 import type DataService from '../services/DataService.js';
+import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 
 const plugin: FastifyPluginAsyncZod<{
     dataService: DataService;
@@ -23,10 +24,21 @@ const plugin: FastifyPluginAsyncZod<{
             onRequest: [fastify.authenticate],
             schema: {
                 params: z.object({ appId: z.string().min(1) }),
-                response: { 200: AppSchemaSchema }
+                response: { 200: AppSchemaSchema, 404: ErrorResponseSchema }
             }
         },
-        request => dataService.getSchema(request.params.appId)
+        async (request, reply) => {
+            const schema = await dataService.getSchema(request.params.appId);
+
+            if (!schema) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                });
+            }
+
+            return schema;
+        }
     );
 
     fastify.post(
@@ -88,17 +100,20 @@ const plugin: FastifyPluginAsyncZod<{
                 ]),
                 response: {
                     200: AppSchemaSchema,
-                    400: z.object({
-                        error: z.string(),
-                        message: z.string(),
-                        details: z.any().optional()
-                    })
+                    404: ErrorResponseSchema
                 }
             }
         },
-        async request => {
+        async (request, reply) => {
             const { appId } = request.params;
             const schema = await dataService.getSchema(appId);
+
+            if (!schema) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                });
+            }
 
             switch (request.body.action) {
                 case 'add':

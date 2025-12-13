@@ -10,6 +10,17 @@ const plugin: FastifyPluginAsyncZod<{
 }> = async (fastify, { dataService }) => {
     async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
         const schema = await dataService.getSchema(appId);
+
+        if (!schema) {
+            return {
+                schema,
+                response: reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                })
+            };
+        }
+
         const table = schema.tables.find(table => table.id === tableId);
 
         if (!table) {

@@ -40,14 +40,14 @@ describe('Schema API', () => {
         expect(body.id).toBe('app1');
     });
 
-    it('should return mock schema for non-existent schema', async () => {
+    it('should return 404 for non-existent schema', async () => {
         const response = await server.inject({
             method: 'GET',
             url: '/api/apps/unknown/schema',
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        expect(response.statusCode).toBe(200);
+        expect(response.statusCode).toBe(404);
     });
 
     it('should save schema (using update action)', async () => {

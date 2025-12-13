@@ -105,7 +105,7 @@ const plugin: FastifyPluginAsyncZod<{
             const table = await connector.getTable(path);
             validateTableKeys(table);
 
-            let schema: AppSchema;
+            let schema: AppSchema | undefined;
             if (appId) {
                 schema = await dataService.getSchema(appId);
 

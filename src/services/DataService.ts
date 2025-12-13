@@ -20,7 +20,6 @@ import {
 import type { DuckDBValue } from '@duckdb/node-api';
 import knex from 'knex';
 import { extractKeys } from '../utils/schemaUtils.js';
-import mock_data from '../connectors/mock_data.json' with { type: 'json' };
 import { decodeRow, encodeRow } from '../utils/dataUtils.js';
 
 const qb = knex({ client: 'pg' });
@@ -120,17 +119,7 @@ export default class DataService {
             limit: 1
         });
 
-        let schema = schemas[0] as AppSchema;
-        if (!schema) {
-            schema = { ...mock_data } as unknown as AppSchema;
-            this.executeAction({
-                appId,
-                table: this.schemaTable,
-                actId: 'add',
-                rows: [schema]
-            });
-        }
-
+        const schema = schemas[0] as AppSchema | undefined;
         this.schemaCache.set(appId, schema);
         return schema;
     }
@@ -149,11 +138,14 @@ export default class DataService {
     }
 
     async deleteSchema(appId: string) {
+        const schema = await this.getSchema(appId);
+        if (!schema) return this.schemaCache.delete(appId);
+
         this.executeAction({
             appId,
             table: this.schemaTable,
             actId: 'delete',
-            rows: [await this.getSchema(appId)]
+            rows: [schema]
         });
 
         this.schemaCache.delete(appId);
