@@ -48,6 +48,10 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
                 connector: 'mem',
                 path: ['schemas']
             },
+            connectionsConnector: {
+                connector: 'mem',
+                path: ['connections']
+            },
             connectors: [connector],
             encryptionKey: opts?.encryptionKey
         }

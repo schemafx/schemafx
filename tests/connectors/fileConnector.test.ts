@@ -49,7 +49,7 @@ describe('FileConnector', () => {
 
         it('should add row and persist to file', async () => {
             const row = { id: 1, name: 'User 1' };
-            await connector.addRow!(table, row);
+            await connector.addRow!(table, undefined, row);
 
             const content = JSON.parse(await readFile(TEST_DB_PATH, 'utf-8'));
             expect(content.tables.users).toHaveLength(1);
@@ -57,22 +57,22 @@ describe('FileConnector', () => {
         });
 
         it('should get data', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             const data = await connector.getData!(table);
             expect(data).toHaveLength(1);
         });
 
         it('should update row', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.updateRow!(table, { id: 1 }, { id: 1, name: 'Updated' });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.updateRow!(table, undefined, { id: 1 }, { id: 1, name: 'Updated' });
 
             const content = JSON.parse(await readFile(TEST_DB_PATH, 'utf-8'));
             expect(content.tables.users[0].name).toBe('Updated');
         });
 
         it('should delete row', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.deleteRow!(table, { id: 1 });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.deleteRow!(table, undefined, { id: 1 });
 
             const content = JSON.parse(await readFile(TEST_DB_PATH, 'utf-8'));
             expect(content.tables.users).toHaveLength(0);

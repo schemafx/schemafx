@@ -49,7 +49,26 @@ const plugin: FastifyPluginAsyncZod<{
                 params: z.object({ appId: z.string().min(1) }),
                 body: z.discriminatedUnion('action', [
                     z.object({
-                        action: z.enum(['add', 'update']),
+                        action: z.literal('add'),
+                        element: z.discriminatedUnion('partOf', [
+                            z.object({
+                                partOf: z.literal('views'),
+                                element: AppViewSchema
+                            }),
+                            z.object({
+                                partOf: z.literal('fields'),
+                                element: AppFieldSchema,
+                                parentId: z.string().min(1)
+                            }),
+                            z.object({
+                                partOf: z.literal('actions'),
+                                element: AppActionSchema,
+                                parentId: z.string().min(1)
+                            })
+                        ])
+                    }),
+                    z.object({
+                        action: z.literal('update'),
                         element: z.discriminatedUnion('partOf', [
                             z.object({
                                 partOf: z.literal('tables'),
@@ -119,10 +138,7 @@ const plugin: FastifyPluginAsyncZod<{
                 case 'add':
                     const addEl = request.body.element;
 
-                    if (addEl.partOf === 'tables') {
-                        validateTableKeys(addEl.element as AppTable);
-                        schema.tables.push(addEl.element as AppTable);
-                    } else if (addEl.partOf === 'views') {
+                    if (addEl.partOf === 'views') {
                         schema.views.push(addEl.element as AppView);
                     } else if (addEl.partOf === 'fields' && addEl.parentId) {
                         const oldFieldsLength =

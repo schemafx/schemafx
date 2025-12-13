@@ -392,6 +392,10 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
                     connector: memConnector.id,
                     path: ['schemas']
                 },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
+                },
                 connectors: [memConnector, limitedConnector]
             }
         });

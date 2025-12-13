@@ -7,7 +7,9 @@ import {
     type Connector,
     type AppSchema,
     AppSchemaSchema,
-    QueryFilterOperator
+    QueryFilterOperator,
+    AppConnectionSchema,
+    AppConnection
 } from '../types.js';
 import type { z } from 'zod';
 import { type AppTableFromZodOptions, tableFromZod, zodFromTable } from '../utils/zodUtils.js';
@@ -24,8 +26,20 @@ import { decodeRow, encodeRow } from '../utils/dataUtils.js';
 
 const qb = knex({ client: 'pg' });
 
+type executeActionOptions = {
+    table: AppTable;
+    actId: string;
+    rows: AppTableRow[];
+    depth?: number;
+};
+
 export type DataServiceOptions = {
     schemaConnector: Omit<AppTableFromZodOptions, 'id' | 'name' | 'primaryKey'>;
+    connectionsConnection?: string;
+    connectionsConnector: Omit<
+        AppTableFromZodOptions,
+        'id' | 'name' | 'primaryKey' | 'connectionId'
+    >;
     connectors: Connector[];
     encryptionKey?: string;
     maxRecursiveDepth?: number;
@@ -37,13 +51,20 @@ export type DataServiceOptions = {
         max?: number;
         ttl?: number;
     };
+    connectionsCacheOpts?: {
+        max?: number;
+        ttl?: number;
+    };
 };
 
 export default class DataService {
     schemaCache: LRUCache<string, AppSchema>;
+    connectionsCache: LRUCache<string, AppConnection>;
     validatorCache: LRUCache<string, z.ZodType>;
 
     schemaTable: AppTable;
+    connectionsConnection?: string;
+    connectionsTable: AppTable;
 
     connectors: Record<string, Connector> = {};
     encryptionKey?: string;
@@ -51,9 +72,12 @@ export default class DataService {
 
     constructor({
         schemaCacheOpts,
+        connectionsCacheOpts,
         validatorCacheOpts,
 
         schemaConnector,
+        connectionsConnection,
+        connectionsConnector,
 
         connectors,
         maxRecursiveDepth,
@@ -62,6 +86,11 @@ export default class DataService {
         this.schemaCache = new LRUCache<string, AppSchema>({
             max: schemaCacheOpts?.max ?? 100,
             ttl: schemaCacheOpts?.ttl ?? 1000 * 60 * 5 // 5 minutes TTL
+        });
+
+        this.connectionsCache = new LRUCache<string, AppConnection>({
+            max: connectionsCacheOpts?.max ?? 100,
+            ttl: connectionsCacheOpts?.ttl ?? 1000 * 60 * 5
         });
 
         this.validatorCache = new LRUCache<string, z.ZodType>({
@@ -101,8 +130,93 @@ export default class DataService {
             ]
         });
 
+        this.connectionsConnection = connectionsConnection;
+        this.connectionsTable = tableFromZod(AppConnectionSchema, {
+            id: '',
+            name: '',
+            primaryKey: 'id',
+            ...connectionsConnector,
+            actions: [
+                {
+                    id: 'add',
+                    name: '',
+                    type: AppActionType.Add
+                },
+                {
+                    id: 'update',
+                    name: '',
+                    type: AppActionType.Update
+                },
+                {
+                    id: 'delete',
+                    name: '',
+                    type: AppActionType.Delete
+                }
+            ]
+        });
+
+        this.connectionsTable.fields[
+            this.connectionsTable.fields.findIndex(f => f.id === 'content')
+        ].encrypted = true;
+
         this.encryptionKey = encryptionKey;
         this.maxRecursiveDepth = maxRecursiveDepth ?? 100;
+    }
+
+    async getConnection(connectionId?: string) {
+        if (!connectionId) return;
+        if (this.connectionsCache.has(connectionId)) {
+            return this.connectionsCache.get(connectionId);
+        }
+
+        const connections = await this._getData(this.connectionsTable, this.connectionsConnection, {
+            filters: [
+                {
+                    field: this.connectionsTable.fields.find(f => f.isKey)!.id,
+                    operator: QueryFilterOperator.Equals,
+                    value: connectionId
+                }
+            ],
+            limit: 1
+        });
+
+        const connection = connections[0] as AppConnection | undefined;
+        this.connectionsCache.set(connectionId, connection);
+        return connection;
+    }
+
+    async getConnections() {
+        return (await this._getData(
+            this.connectionsTable,
+            this.connectionsConnection
+        )) as AppConnection[];
+    }
+
+    async setConnection(connection: AppConnection) {
+        this.connectionsCache.set(connection.id, connection);
+
+        this._executeAction({
+            table: this.connectionsTable,
+            auth: this.connectionsConnection,
+            actId: 'update',
+            rows: [connection]
+        });
+
+        return connection;
+    }
+
+    async deleteConnection(connectionId: string) {
+        const connection = await this.getConnection(connectionId);
+        if (!connection) return this.connectionsCache.delete(connectionId);
+
+        this._executeAction({
+            table: this.connectionsTable,
+            auth: this.connectionsConnection,
+            actId: 'delete',
+            rows: [connection]
+        });
+
+        this.connectionsCache.delete(connectionId);
     }
 
     async getSchema(appId: string) {
@@ -149,13 +263,12 @@ export default class DataService {
         this.schemaCache.delete(appId);
     }
 
-    async executeAction(opts: {
-        table: AppTable;
-        actId: string;
-        rows: AppTableRow[];
-        depth?: number;
-    }) {
-        const { table, actId, rows, depth } = opts;
+    private async _executeAction(
+        opts: executeActionOptions & {
+            auth?: string;
+        }
+    ) {
+        const { table, auth, actId, rows, depth } = opts;
 
         if ((depth ?? 0) > this.maxRecursiveDepth) {
             throw new Error('Max recursion depth exceeded.');
@@ -171,6 +284,7 @@ export default class DataService {
                 for (const row of rows) {
                     await this.connectors[table.connector]?.addRow?.(
                         table,
+                        auth,
                         encodeRow(
                             (await validator.parseAsync(row)) as Record<string, unknown>,
                             table,
@@ -190,6 +304,7 @@ export default class DataService {
 
                     await this.connectors[table.connector]?.updateRow?.(
                         table,
+                        auth,
                         key,
                         encodeRow(
                             (await validator.parseAsync(row)) as Record<string, unknown>,
@@ -207,7 +322,7 @@ export default class DataService {
                     const key = extractKeys(row, keyFields);
                     if (Object.keys(key).length === 0) continue;
 
-                    await this.connectors[table.connector]?.deleteRow?.(table, key);
+                    await this.connectors[table.connector]?.deleteRow?.(table, auth, key);
                 }
 
                 return;
@@ -217,7 +332,7 @@ export default class DataService {
                 const subActions = (action.config?.actions as string[]) || [];
 
                 for (const subActionId of subActions) {
-                    await this.executeAction({
+                    await this._executeAction({
                         ...opts,
                         actId: subActionId,
                         depth: (depth ?? 0) + 1
@@ -229,7 +344,12 @@ export default class DataService {
         }
     }
 
-    async getData(table: AppTable, query?: TableQueryOptions) {
+    async executeAction(opts: executeActionOptions) {
+        const connection = await this.getConnection(opts.table.connectionId);
+        return this._executeAction({ ...opts, auth: connection?.content });
+    }
+
+    private async _getData(table: AppTable, auth?: string, query?: TableQueryOptions) {
         const connector = this.connectors[table.connector];
         if (!connector?.getData && !connector?.getDataStream) return [];
 
@@ -240,14 +360,14 @@ export default class DataService {
         if (connector.getDataStream) {
             await ingestStreamToDuckDB(
                 connection,
-                await connector.getDataStream(table),
+                await connector.getDataStream(table, auth),
                 table,
                 tempTableName
             );
         } else {
             await ingestDataToDuckDB(
                 connection,
-                await connector.getData!(table),
+                await connector.getData!(table, auth),
                 table,
                 tempTableName
             );
@@ -270,5 +390,10 @@ export default class DataService {
         connection.closeSync();
 
         return result;
+    }
+
+    async getData(table: AppTable, query?: TableQueryOptions) {
+        const connection = await this.getConnection(table.connectionId);
+        return this._getData(table, connection?.content, query);
     }
 }

@@ -73,7 +73,7 @@ export default class FileConnector extends Connector {
         return db.tables[table.path[0]] || [];
     }
 
-    async addRow(table: AppTable, row?: AppTableRow) {
+    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         const db = await this._readDB();
         if (!row) return;
 
@@ -83,7 +83,12 @@ export default class FileConnector extends Connector {
         await this._writeDB(db);
     }
 
-    async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
+    async updateRow(
+        table: AppTable,
+        auth?: string,
+        key?: Record<string, unknown>,
+        row?: AppTableRow
+    ) {
         const db = await this._readDB();
         if (!key || !row) return;
         if (!db.tables[table.path[0]]) return;
@@ -97,7 +102,7 @@ export default class FileConnector extends Connector {
         }
     }
 
-    async deleteRow(table: AppTable, key?: Record<string, unknown>) {
+    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
         const db = await this._readDB();
         if (!key) return;
         if (!db.tables[table.path[0]]) return;

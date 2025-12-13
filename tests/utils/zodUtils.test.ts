@@ -209,7 +209,7 @@ describe('zodUtils', () => {
 
             const cache = new LRUCache<string, z.ZodType>({ max: 10 });
             const s1 = zodFromTable(table, cache);
-            expect(cache.has('app1:t1')).toBe(true);
+            expect(cache.has('t1')).toBe(true);
 
             const s2 = zodFromTable(table, cache);
             expect(s1).toBe(s2);

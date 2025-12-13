@@ -273,6 +273,7 @@ describe('Encrypted Fields Integration', () => {
                 fields: [],
                 actions: []
             },
+            undefined,
             { id: '1', secret: 'invalid-encrypted-string' }
         );
 

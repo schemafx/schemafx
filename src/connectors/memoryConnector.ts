@@ -39,7 +39,7 @@ export default class MemoryConnector extends Connector {
         return [...(this.tables.get(table.path[0]) ?? [])];
     }
 
-    async addRow(table: AppTable, row?: AppTableRow) {
+    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         const data = await this.getData(table);
         if (!row) return;
 
@@ -47,7 +47,12 @@ export default class MemoryConnector extends Connector {
         this.tables.set(table.path[0], data);
     }
 
-    async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
+    async updateRow(
+        table: AppTable,
+        auth?: string,
+        key?: Record<string, unknown>,
+        row?: AppTableRow
+    ) {
         const data = await this.getData(table);
 
         if (!key || !row) return;
@@ -60,7 +65,7 @@ export default class MemoryConnector extends Connector {
         this.tables.set(table.path[0], data);
     }
 
-    async deleteRow(table: AppTable, key?: Record<string, unknown>) {
+    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
         const data = await this.getData(table);
 
         if (!key) return;

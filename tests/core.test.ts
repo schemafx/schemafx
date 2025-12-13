@@ -11,6 +11,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['schemas']
                 },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
+                },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
@@ -26,6 +30,10 @@ describe('Core SchemaFX', () => {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
+                },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
                 },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             },
@@ -56,6 +64,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['schemas']
                 },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
+                },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
@@ -76,6 +88,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['schemas']
                 },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
+                },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             }
         });
@@ -92,6 +108,10 @@ describe('Core SchemaFX', () => {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
+                },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
                 },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             }
@@ -115,6 +135,10 @@ describe('Core SchemaFX', () => {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
+                },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
                 },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             }
@@ -148,6 +172,10 @@ describe('Core SchemaFX', () => {
                 schemaConnector: {
                     connector: 'mem',
                     path: ['schemas']
+                },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
                 },
                 connectors: [new MemoryConnector('Mem', 'mem')]
             }

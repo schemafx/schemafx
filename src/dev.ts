@@ -20,6 +20,10 @@ const app = new SchemaFX({
             connector: fileConnector.id,
             path: ['schemas']
         },
+        connectionsConnector: {
+            connector: fileConnector.id,
+            path: ['connections']
+        },
         connectors: [memoryConnector, fileConnector],
         encryptionKey:
             process.env.ENCRYPTION_KEY ||

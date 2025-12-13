@@ -98,6 +98,10 @@ describe('DuckDB Integration Benchmark', () => {
                     connector: memConnector.id,
                     path: ['schemas']
                 },
+                connectionsConnector: {
+                    connector: memConnector.id,
+                    path: ['connections']
+                },
                 connectors: [memConnector, benchConnector]
             }
         });

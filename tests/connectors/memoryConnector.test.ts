@@ -34,7 +34,7 @@ describe('MemoryConnector', () => {
 
         it('should add row', async () => {
             const row = { id: 1, name: 'User 1' };
-            await connector.addRow!(table, row);
+            await connector.addRow!(table, undefined, row);
 
             const data = await connector.getData!(table);
             expect(data).toHaveLength(1);
@@ -42,24 +42,24 @@ describe('MemoryConnector', () => {
         });
 
         it('should get data', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.addRow!(table, { id: 2, name: 'User 2' });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.addRow!(table, undefined, { id: 2, name: 'User 2' });
 
             const data = await connector.getData!(table);
             expect(data).toHaveLength(2);
         });
 
         it('should update row', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.updateRow!(table, { id: 1 }, { id: 1, name: 'Updated' });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.updateRow!(table, undefined, { id: 1 }, { id: 1, name: 'Updated' });
 
             const data = await connector.getData!(table);
             expect(data[0].name).toBe('Updated');
         });
 
         it('should delete row', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.deleteRow!(table, { id: 1 });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.deleteRow!(table, undefined, { id: 1 });
             const data = await connector.getData!(table);
             expect(data).toHaveLength(0);
         });
