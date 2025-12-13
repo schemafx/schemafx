@@ -106,7 +106,7 @@ export default class DataService {
     }
 
     async getSchema(appId: string) {
-        if (this.schemaCache.has(appId)) return this.schemaCache.get(appId)!;
+        if (this.schemaCache.has(appId)) return this.schemaCache.get(appId);
 
         const schemas = await this.getData(this.schemaTable, {
             filters: [
@@ -128,7 +128,6 @@ export default class DataService {
         this.schemaCache.set(schema.id, schema);
 
         this.executeAction({
-            appId: schema.id,
             table: this.schemaTable,
             actId: 'update',
             rows: [schema]
@@ -142,7 +141,6 @@ export default class DataService {
         if (!schema) return this.schemaCache.delete(appId);
 
         this.executeAction({
-            appId,
             table: this.schemaTable,
             actId: 'delete',
             rows: [schema]
@@ -152,13 +150,12 @@ export default class DataService {
     }
 
     async executeAction(opts: {
-        appId: string;
         table: AppTable;
         actId: string;
         rows: AppTableRow[];
         depth?: number;
     }) {
-        const { appId, table, actId, rows, depth } = opts;
+        const { table, actId, rows, depth } = opts;
 
         if ((depth ?? 0) > this.maxRecursiveDepth) {
             throw new Error('Max recursion depth exceeded.');
@@ -170,7 +167,7 @@ export default class DataService {
 
         switch (action.type) {
             case AppActionType.Add: {
-                const validator = zodFromTable(table, appId, this.validatorCache);
+                const validator = zodFromTable(table, this.validatorCache);
                 for (const row of rows) {
                     await this.connectors[table.connector]?.addRow?.(
                         table,
@@ -186,7 +183,7 @@ export default class DataService {
             }
 
             case AppActionType.Update: {
-                const validator = zodFromTable(table, appId, this.validatorCache);
+                const validator = zodFromTable(table, this.validatorCache);
                 for (const row of rows) {
                     const key = extractKeys(row, keyFields);
                     if (Object.keys(key).length === 0) continue;

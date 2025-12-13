@@ -55,7 +55,6 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
 
     await app.dataService.setSchema(schema);
     await app.dataService.executeAction({
-        appId: schema.id,
         table: schema.tables[0],
         actId: 'add',
         rows: [{ id: 1, name: 'User 1' }]

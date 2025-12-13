@@ -65,14 +65,14 @@ export function zodFromFields(fields: AppField[]) {
 /**
  * Generate a Zod object from an AppTable definition.
  * @param table Table to generate the validator from.
+ * @param cache Validator cache.
  * @returns Zod object validator from table.
  */
-export function zodFromTable(table: AppTable, appId: string, cache: LRUCache<string, z.ZodType>) {
-    const cacheKey = `${appId}:${table.id}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey)!;
+export function zodFromTable(table: AppTable, cache: LRUCache<string, z.ZodType>) {
+    if (cache.has(table.id)) return cache.get(table.id)!;
 
     const validator = zodFromFields(table.fields);
-    cache.set(cacheKey, validator);
+    cache.set(table.id, validator);
     return validator;
 }
 

@@ -113,8 +113,7 @@ const plugin: FastifyPluginAsyncZod<{
             await dataService.executeAction({
                 table,
                 actId: actionId,
-                rows,
-                appId
+                rows
             });
 
             return dataService.getData(table);
