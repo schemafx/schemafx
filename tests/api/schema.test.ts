@@ -115,7 +115,7 @@ describe('Schema API', () => {
     });
 
     it('should add field and update related views', async () => {
-        await app.dataService.setSchema('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -176,7 +176,7 @@ describe('Schema API', () => {
     });
 
     it('should delete field and update related views', async () => {
-        await app.dataService.setSchema('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -238,7 +238,7 @@ describe('Schema API', () => {
     });
 
     it('should prevent deleting the last key field', async () => {
-        await app.dataService.setSchema('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -281,7 +281,7 @@ describe('Schema API', () => {
     });
 
     it('should prevent updating field to remove key property if no other key exists', async () => {
-        await app.dataService.setSchema('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -328,7 +328,7 @@ describe('Schema API', () => {
     });
 
     it('should handle actions operations', async () => {
-        await app.dataService.setSchema('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -406,7 +406,7 @@ describe('Schema API', () => {
     });
 
     it('should reorder tables', async () => {
-        await app.dataService.setSchema('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [

@@ -146,7 +146,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(appId, schema);
+                    return dataService.setSchema(schema);
                 case 'update':
                     const updateEl = request.body.element;
 
@@ -199,7 +199,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(appId, schema);
+                    return dataService.setSchema(schema);
                 case 'delete':
                     const delEl = request.body.element;
 
@@ -256,7 +256,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(appId, schema);
+                    return dataService.setSchema(schema);
                 case 'reorder':
                     const reoEl = request.body.element;
                     const { oldIndex, newIndex } = request.body;
@@ -283,7 +283,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(appId, schema);
+                    return dataService.setSchema(schema);
             }
 
             return dataService.getSchema(request.params.appId);

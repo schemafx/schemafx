@@ -39,7 +39,7 @@ describe('Encrypted Fields Integration', () => {
         });
 
         // Setup schema with encrypted fields
-        await app.dataService.setSchema('enc-app', {
+        await app.dataService.setSchema({
             id: 'enc-app',
             name: 'Encrypted App',
             tables: [
@@ -123,7 +123,7 @@ describe('Encrypted Fields Integration', () => {
     it('should handle missing encryption key gracefully (store plain?) or throw?', async () => {
         const { app, connector, token } = await createTestApp(true);
 
-        await app.dataService.setSchema('plain-app', {
+        await app.dataService.setSchema({
             id: 'plain-app',
             name: 'Plain App',
             tables: [
@@ -173,7 +173,7 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        await app.dataService.setSchema('falsy-app', {
+        await app.dataService.setSchema({
             id: 'falsy-app',
             name: 'Falsy App',
             tables: [
@@ -245,7 +245,7 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        await app.dataService.setSchema('error-app', {
+        await app.dataService.setSchema({
             id: 'error-app',
             name: 'Error App',
             tables: [

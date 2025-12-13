@@ -135,11 +135,11 @@ export default class DataService {
         return schema;
     }
 
-    async setSchema(appId: string, schema: AppSchema) {
-        this.schemaCache.set(appId, schema);
+    async setSchema(schema: AppSchema) {
+        this.schemaCache.set(schema.id, schema);
 
         this.executeAction({
-            appId,
+            appId: schema.id,
             table: this.schemaTable,
             actId: 'update',
             rows: [schema]

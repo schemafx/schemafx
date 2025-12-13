@@ -126,7 +126,7 @@ const plugin: FastifyPluginAsyncZod<{
                 };
             }
 
-            return dataService.setSchema(schema.id, schema);
+            return dataService.setSchema(schema);
         }
     );
 };
