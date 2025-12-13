@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import inferTable from '../../src/utils/inferTable.js';
+import { inferTable } from '../../src/utils/dataUtils.js';
 import { AppFieldType } from '../../src/types.js';
 
 describe('inferTable', () => {
@@ -66,8 +66,6 @@ describe('inferTable', () => {
 
     it('should default to Text for unknown types', () => {
         const data = [{ val: Symbol('s') }];
-        // JSON.stringify ignores symbols, but let's see how inferTable handles it.
-        // inferTable likely iterates keys.
         const table = inferTable('Table', [], data as any, 'mem');
         const field = table.fields.find(f => f.id === 'val');
         expect(field?.type).toBe(AppFieldType.Text);

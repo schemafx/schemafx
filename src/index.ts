@@ -24,7 +24,7 @@ export {
     type TableQueryOptions
 } from './types.js';
 
-export { default as inferTable } from './utils/inferTable.js';
+export { inferTable } from './utils/dataUtils.js';
 
 // Connectors
 export { default as MemoryConnector } from './connectors/memoryConnector.js';

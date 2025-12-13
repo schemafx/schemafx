@@ -6,7 +6,7 @@ import {
     type AppTable,
     ConnectorTableCapability
 } from '../types.js';
-import inferTable from '../utils/inferTable.js';
+import { inferTable } from '../utils/dataUtils.js';
 
 type FileDB = {
     schemas: Record<string, AppSchema>;

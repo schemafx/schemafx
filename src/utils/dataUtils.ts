@@ -1,26 +1,6 @@
-import type { z } from 'zod';
-import {
-    AppActionType,
-    AppFieldType,
-    type AppTableRow,
-    type Connector,
-    type AppTable,
-    type TableQueryOptions
-} from '../types.js';
+import { randomUUID } from 'node:crypto';
+import { type AppField, AppFieldType, type AppTableRow, type AppTable } from '../types.js';
 import { decrypt, encrypt } from './encryption.js';
-import { extractKeys } from './schemaUtils.js';
-import type { LRUCache } from 'lru-cache';
-import knex from 'knex';
-import {
-    buildSQLQuery,
-    createDuckDBInstance,
-    ingestDataToDuckDB,
-    ingestStreamToDuckDB
-} from './duckdb.js';
-import type { DuckDBValue } from '@duckdb/node-api';
-import { zodFromTable } from './zodUtils.js';
-
-const qb = knex({ client: 'pg' });
 
 export function encodeRow(
     row: Record<string, unknown>,
@@ -76,135 +56,67 @@ export function decodeRow(
     return processedRow;
 }
 
-export async function executeAction(opts: {
-    appId: string;
-    connector: Connector;
-    table: AppTable;
-    validatorCache: LRUCache<string, z.ZodType>;
-    actId: string;
-    currentRows: AppTableRow[];
-    depth: number;
-    maxDepth?: number;
-    encryptionKey?: string;
-}) {
-    const {
-        appId,
-        connector,
-        table,
-        validatorCache,
-        actId,
-        currentRows,
-        depth,
-        maxDepth,
-        encryptionKey
-    } = opts;
+/**
+ * Infer a Table Schema from data.
+ * @param name Name of the Table.
+ * @param path Path to the Table.
+ * @param data Data to infer from.
+ * @param connectorId Id of the Connector.
+ * @returns Inferred Table Schema.
+ */
+export function inferTable(
+    name: string,
+    path: string[],
+    data: AppTableRow[],
+    connectorId: string
+): AppTable {
+    const keys = new Set<string>();
+    for (const row of data) Object.keys(row).forEach(k => keys.add(k));
 
-    if (maxDepth && depth > maxDepth) {
-        throw new Error('Max recursion depth exceeded.');
-    }
+    const fields: AppField[] = [];
+    let hasKey = false;
+    for (const key of keys) {
+        let detectedType: AppFieldType | null = null;
 
-    const action = table.actions?.find(a => a.id === actId);
-    if (!action) throw new Error(`Action ${actId} not found.`);
-    const keyFields = table.fields.filter(f => f.isKey).map(f => f.id);
+        for (const row of data) {
+            const val = row[key];
+            if (val === null || val === undefined) continue;
 
-    switch (action.type) {
-        case AppActionType.Add: {
-            const validator = zodFromTable(table, appId, validatorCache);
-            for (const row of currentRows) {
-                await connector?.addRow?.(
-                    table,
-                    encodeRow(
-                        (await validator.parseAsync(row)) as Record<string, unknown>,
-                        table,
-                        encryptionKey
-                    )
-                );
+            let type = AppFieldType.Text;
+            if (typeof val === 'number') type = AppFieldType.Number;
+            else if (typeof val === 'boolean') type = AppFieldType.Boolean;
+            else if (val instanceof Date) type = AppFieldType.Date;
+            else if (Array.isArray(val)) type = AppFieldType.List;
+            else if (typeof val === 'object') type = AppFieldType.JSON;
+
+            if (detectedType && detectedType !== type) {
+                detectedType = AppFieldType.Text;
+                break;
             }
 
-            return;
+            if (!detectedType) detectedType = type;
         }
 
-        case AppActionType.Update: {
-            const validator = zodFromTable(table, appId, validatorCache);
-            for (const row of currentRows) {
-                const key = extractKeys(row, keyFields);
-                if (Object.keys(key).length === 0) continue;
-
-                await connector?.updateRow?.(
-                    table,
-                    key,
-                    encodeRow(
-                        (await validator.parseAsync(row)) as Record<string, unknown>,
-                        table,
-                        encryptionKey
-                    )
-                );
-            }
-
-            return;
-        }
-
-        case AppActionType.Delete: {
-            for (const row of currentRows) {
-                const key = extractKeys(row, keyFields);
-                if (Object.keys(key).length === 0) continue;
-
-                await connector?.deleteRow?.(table, key);
-            }
-
-            return;
-        }
-
-        case AppActionType.Process: {
-            const subActions = (action.config?.actions as string[]) || [];
-
-            for (const subActionId of subActions) {
-                await executeAction({ ...opts, actId: subActionId });
-            }
-
-            return;
-        }
-    }
-}
-
-export async function handleDataRetriever(
-    table: AppTable,
-    connector: Connector,
-    query?: TableQueryOptions,
-    encryptionKey?: string
-) {
-    if (!connector.getData && !connector.getDataStream) return [];
-
-    const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
-    const dbInstance = await createDuckDBInstance();
-    const connection = await dbInstance.connect();
-
-    if (connector.getDataStream) {
-        await ingestStreamToDuckDB(
-            connection,
-            await connector.getDataStream(table),
-            table,
-            tempTableName
-        );
-    } else {
-        await ingestDataToDuckDB(connection, await connector.getData!(table), table, tempTableName);
-    }
-
-    const { sql, params } = buildSQLQuery(tempTableName, query || {});
-    const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
-    const rows = await reader.getRows();
-
-    const result = rows.map(row => {
-        const obj: Record<string, unknown> = {};
-        table.fields.forEach((field, index) => {
-            obj[field.id] = row[index];
+        const isKey = key === 'id';
+        fields.push({
+            id: key,
+            name: key,
+            type: detectedType || AppFieldType.Text,
+            isRequired: false,
+            isKey
         });
 
-        return decodeRow(obj, table, encryptionKey);
-    });
+        if (isKey) hasKey = true;
+    }
 
-    await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
-    connection.closeSync();
+    if (!hasKey && fields[0]) fields[0].isKey = true;
 
-    return result;
+    return {
+        id: randomUUID(),
+        name,
+        connector: connectorId,
+        path,
+        fields,
+        actions: []
+    };
 }
