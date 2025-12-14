@@ -135,9 +135,10 @@ const plugin: FastifyPluginAsyncZod<{
         '/connectors/:connectorName/auth/callback',
         {
             schema: {
-                params: z.looseObject({
+                params: z.object({
                     connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
                 }),
+                querystring: z.looseObject({}),
                 response: {
                     200: z.object({ connectionId: z.string() }),
                     404: ErrorResponseSchema
@@ -157,7 +158,7 @@ const plugin: FastifyPluginAsyncZod<{
             const connection = await dataService.setConnection({
                 id: randomUUID(),
                 connector: connector.id,
-                ...(await connector.authorize({ ...request.params }))
+                ...(await connector.authorize({ ...request.query }))
             });
 
             return reply.code(200).send({ connectionId: connection.id });
