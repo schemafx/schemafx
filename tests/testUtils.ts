@@ -5,7 +5,7 @@ import SchemaFX, {
     MemoryConnector
 } from '../src/index.js';
 
-export async function createTestApp(includeToken?: boolean) {
+export async function createTestApp(includeToken?: boolean, opts?: { encryptionKey?: string }) {
     const connector = new MemoryConnector('Memory', 'mem');
     const schema = {
         id: 'app1',
@@ -39,19 +39,29 @@ export async function createTestApp(includeToken?: boolean) {
         views: []
     } as AppSchema;
 
-    await connector.saveSchema!('app1', schema);
-    await connector.addRow!(schema.tables[0], { id: 1, name: 'User 1' });
-
     const app = new SchemaFX({
         jwtOpts: {
             secret: 'test-secret'
         },
-        connectorOpts: {
-            schemaConnector: 'mem',
-            connectors: {
-                [connector.id]: connector
-            }
+        dataServiceOpts: {
+            schemaConnector: {
+                connector: 'mem',
+                path: ['schemas']
+            },
+            connectionsConnector: {
+                connector: 'mem',
+                path: ['connections']
+            },
+            connectors: [connector],
+            encryptionKey: opts?.encryptionKey
         }
+    });
+
+    await app.dataService.setSchema(schema);
+    await app.dataService.executeAction({
+        table: schema.tables[0],
+        actId: 'add',
+        rows: [{ id: 1, name: 'User 1' }]
     });
 
     return {

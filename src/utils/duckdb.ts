@@ -1,10 +1,15 @@
 import {
     DuckDBInstance,
-    DuckDBAppender,
-    DuckDBConnection,
+    type DuckDBAppender,
+    type DuckDBConnection,
     DuckDBTimestampMillisecondsValue
 } from '@duckdb/node-api';
-import { AppFieldType, type AppTable, QueryFilterOperator, TableQueryOptions } from '../types.js';
+import {
+    AppFieldType,
+    type AppTable,
+    QueryFilterOperator,
+    type TableQueryOptions
+} from '../types.js';
 import { Readable } from 'node:stream';
 import knex from 'knex';
 

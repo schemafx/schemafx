@@ -1,27 +1,15 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { type Connector, AppSchemaSchema, ConnectorTableSchema } from '../types.js';
-import { validateTableKeys, ErrorResponseSchema } from '../utils/schemaUtils.js';
+import { AppSchemaSchema, ConnectorTableSchema } from '../types.js';
+import { validateTableKeys } from '../utils/schemaUtils.js';
+import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
 import { randomUUID } from 'node:crypto';
-import { LRUCache } from 'lru-cache';
+import type DataService from '../services/DataService.js';
 
-export type ConnectorsPluginOptions = {
-    connectors: Record<string, Connector>;
-    sConnector: Connector;
-    schemaCache: LRUCache<string, AppSchema>;
-    getSchema: (appId: string) => Promise<AppSchema>;
-};
-
-const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
-    fastify,
-    { connectors, sConnector, schemaCache, getSchema }
-) => {
-    const _connectors = Object.values(connectors).map(connector => ({
-        id: connector.id,
-        name: connector.name
-    }));
-
+const plugin: FastifyPluginAsyncZod<{
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
     fastify.get(
         '/connectors',
         {
@@ -31,14 +19,56 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                         .array(
                             z.object({
                                 id: z.string().meta({ description: 'Connector ID' }),
-                                name: z.string().meta({ description: 'Connector Name' })
+                                name: z.string().meta({ description: 'Connector Name' }),
+                                connection: z
+                                    .object({
+                                        id: z
+                                            .string()
+                                            .optional()
+                                            .meta({ description: 'Connection Id' }),
+                                        name: z
+                                            .string()
+                                            .optional()
+                                            .meta({ description: 'Connection Name' })
+                                    })
+                                    .optional()
+                                    .meta({ description: 'Connection details.' }),
+                                requiresConnection: z.boolean().default(false).meta({
+                                    description: 'Whether the connector must be reconnected.'
+                                })
                             })
                         )
                         .meta({ description: 'List of available connectors' })
                 }
             }
         },
-        async () => _connectors
+        async () => {
+            const connections = await dataService.getConnections();
+
+            return Object.values(dataService.connectors)
+                .map(connector => {
+                    const base = {
+                        id: connector.id,
+                        name: connector.name,
+                        requiresConnection: !!connector.authorize
+                    };
+
+                    return [
+                        base,
+                        ...connections
+                            .filter(c => c.connector === connector.id)
+                            .map(c => ({
+                                ...base,
+                                connection: {
+                                    id: c.id,
+                                    name: c.name
+                                },
+                                requiresConnection: false
+                            }))
+                    ];
+                })
+                .flat();
+        }
     );
 
     fastify.post(
@@ -50,7 +80,8 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                     connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
                 }),
                 body: z.object({
-                    path: z.array(z.string()).meta({ description: 'Path to query tables from' })
+                    path: z.array(z.string()).meta({ description: 'Path to query tables from' }),
+                    connectionId: z.string().optional()
                 }),
                 response: {
                     200: z
@@ -62,7 +93,7 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
             }
         },
         async (request, reply) => {
-            const connector = connectors[request.params.connectorName];
+            const connector = dataService.connectors[request.params.connectorName];
 
             if (!connector) {
                 return reply.code(404).send({
@@ -71,7 +102,104 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                 });
             }
 
-            return connector.listTables(request.body.path);
+            return connector.listTables(
+                request.body.path,
+                (await dataService.getConnection(request.body.connectionId))?.content
+            );
+        }
+    );
+
+    fastify.get(
+        '/connectors/:connectorName/auth',
+        {
+            schema: {
+                params: z.object({
+                    connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
+                }),
+                response: {
+                    404: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const connector = dataService.connectors[request.params.connectorName];
+
+            if (!connector?.getAuthUrl) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Connector not found.'
+                });
+            }
+
+            return reply.redirect(await connector.getAuthUrl(), 302);
+        }
+    );
+
+    fastify.get(
+        '/connectors/:connectorName/auth/callback',
+        {
+            schema: {
+                params: z.object({
+                    connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
+                }),
+                querystring: z.looseObject({}),
+                response: {
+                    200: z.object({ connectionId: z.string() }),
+                    404: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const connector = dataService.connectors[request.params.connectorName];
+
+            if (!connector?.authorize) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Connector not found.'
+                });
+            }
+
+            const connection = await dataService.setConnection({
+                id: randomUUID(),
+                connector: connector.id,
+                ...(await connector.authorize({ ...request.query }))
+            });
+
+            return reply.code(200).send({ connectionId: connection.id });
+        }
+    );
+
+    fastify.post(
+        '/connectors/:connectorName/auth',
+        {
+            schema: {
+                params: z.object({
+                    connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
+                }),
+                body: z.looseObject({}),
+                response: {
+                    200: z.object({ connectionId: z.string() }),
+                    404: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const connector = dataService.connectors[request.params.connectorName];
+
+            if (!connector?.authorize) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Connector not found.'
+                });
+            }
+
+            const connection = await dataService.setConnection({
+                id: randomUUID(),
+                connector: connector.id,
+                ...(await connector.authorize({ ...request.body }))
+            });
+
+            return reply.code(200).send({ connectionId: connection.id });
         }
     );
 
@@ -85,6 +213,7 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                 }),
                 body: z.object({
                     path: z.array(z.string()).meta({ description: 'Path to the table' }),
+                    connectionId: z.string().optional(),
                     appId: z
                         .string()
                         .min(1)
@@ -99,7 +228,7 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
             }
         },
         async (request, reply) => {
-            const connector = connectors[request.params.connectorName];
+            const connector = dataService.connectors[request.params.connectorName];
 
             if (!connector) {
                 return reply.code(404).send({
@@ -108,13 +237,15 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                 });
             }
 
-            const { path, appId } = request.body;
-            const table = await connector.getTable(path);
+            const { path, appId, connectionId } = request.body;
+            const auth = await dataService.getConnection(connectionId);
+            const table = await connector.getTable(path, auth?.content);
+            table.connectionId = connectionId;
             validateTableKeys(table);
 
-            let schema: AppSchema;
+            let schema: AppSchema | undefined;
             if (appId) {
-                schema = await getSchema(appId);
+                schema = await dataService.getSchema(appId);
 
                 if (!schema) {
                     return reply.code(404).send({
@@ -133,8 +264,7 @@ const plugin: FastifyPluginAsyncZod<ConnectorsPluginOptions> = async (
                 };
             }
 
-            schemaCache.delete(schema.id);
-            return sConnector.saveSchema!(schema.id, schema);
+            return dataService.setSchema(schema);
         }
     );
 };

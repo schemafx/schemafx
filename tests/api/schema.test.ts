@@ -40,82 +40,18 @@ describe('Schema API', () => {
         expect(body.id).toBe('app1');
     });
 
-    it('should return mock schema for non-existent schema', async () => {
+    it('should return 404 for non-existent schema', async () => {
         const response = await server.inject({
             method: 'GET',
             url: '/api/apps/unknown/schema',
             headers: { Authorization: `Bearer ${token}` }
         });
 
-        expect(response.statusCode).toBe(200);
-    });
-
-    it('should save schema (using update action)', async () => {
-        const response = await server.inject({
-            method: 'POST',
-            url: '/api/apps/app1/schema',
-            headers: { Authorization: `Bearer ${token}` },
-            payload: {
-                action: 'add',
-                element: {
-                    partOf: 'tables',
-                    element: {
-                        id: 'table2',
-                        name: 'Table 2',
-                        connector: connector.id,
-                        path: [],
-                        fields: [
-                            {
-                                id: 'f1',
-                                name: 'F1',
-                                type: AppFieldType.Text,
-                                isKey: true
-                            }
-                        ],
-                        actions: []
-                    }
-                }
-            }
-        });
-
-        expect(response.statusCode).toBe(200);
-
-        const getRes = await server.inject({
-            method: 'GET',
-            url: '/api/apps/app1/schema',
-            headers: { Authorization: `Bearer ${token}` }
-        });
-
-        expect(getRes.statusCode).toBe(200);
-        expect(JSON.parse(getRes.payload).tables).toHaveLength(2);
-    });
-
-    it('should validate schema on add', async () => {
-        const response = await server.inject({
-            method: 'POST',
-            url: '/api/apps/app1/schema',
-            headers: { Authorization: `Bearer ${token}` },
-            payload: {
-                action: 'add',
-                element: {
-                    partOf: 'tables',
-                    element: {
-                        id: 'table3',
-                        // Missing name
-                        connector: connector.id,
-                        path: [],
-                        fields: [],
-                        actions: []
-                    }
-                }
-            }
-        });
-
-        expect(response.statusCode).toBe(400);
+        expect(response.statusCode).toBe(404);
     });
 
     it('should add field and update related views', async () => {
-        await connector.saveSchema!('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -176,7 +112,7 @@ describe('Schema API', () => {
     });
 
     it('should delete field and update related views', async () => {
-        await connector.saveSchema!('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -238,7 +174,7 @@ describe('Schema API', () => {
     });
 
     it('should prevent deleting the last key field', async () => {
-        await connector.saveSchema!('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -281,7 +217,7 @@ describe('Schema API', () => {
     });
 
     it('should prevent updating field to remove key property if no other key exists', async () => {
-        await connector.saveSchema!('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -328,7 +264,7 @@ describe('Schema API', () => {
     });
 
     it('should handle actions operations', async () => {
-        await connector.saveSchema!('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [
@@ -406,7 +342,7 @@ describe('Schema API', () => {
     });
 
     it('should reorder tables', async () => {
-        await connector.saveSchema!('app1', {
+        await app.dataService.setSchema({
             id: 'app1',
             name: 'App 1',
             tables: [

@@ -1,7 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
-    type AppSchema,
     AppSchemaSchema,
     type AppTable,
     type AppView,
@@ -13,30 +12,33 @@ import {
     AppActionSchema
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
-import { LRUCache } from 'lru-cache';
-import type { Connector } from '../types.js';
+import type DataService from '../services/DataService.js';
+import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 
-export type SchemaPluginOptions = {
-    sConnector: Connector;
-    schemaCache: LRUCache<string, AppSchema>;
-    validatorCache: LRUCache<string, z.ZodTypeAny>;
-    getSchema: (appId: string) => Promise<AppSchema>;
-};
-
-const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
-    fastify,
-    { sConnector, schemaCache, validatorCache, getSchema }
-) => {
+const plugin: FastifyPluginAsyncZod<{
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
     fastify.get(
         '/apps/:appId/schema',
         {
             onRequest: [fastify.authenticate],
             schema: {
                 params: z.object({ appId: z.string().min(1) }),
-                response: { 200: AppSchemaSchema }
+                response: { 200: AppSchemaSchema, 404: ErrorResponseSchema }
             }
         },
-        request => getSchema(request.params.appId)
+        async (request, reply) => {
+            const schema = await dataService.getSchema(request.params.appId);
+
+            if (!schema) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                });
+            }
+
+            return schema;
+        }
     );
 
     fastify.post(
@@ -47,7 +49,26 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                 params: z.object({ appId: z.string().min(1) }),
                 body: z.discriminatedUnion('action', [
                     z.object({
-                        action: z.enum(['add', 'update']),
+                        action: z.literal('add'),
+                        element: z.discriminatedUnion('partOf', [
+                            z.object({
+                                partOf: z.literal('views'),
+                                element: AppViewSchema
+                            }),
+                            z.object({
+                                partOf: z.literal('fields'),
+                                element: AppFieldSchema,
+                                parentId: z.string().min(1)
+                            }),
+                            z.object({
+                                partOf: z.literal('actions'),
+                                element: AppActionSchema,
+                                parentId: z.string().min(1)
+                            })
+                        ])
+                    }),
+                    z.object({
+                        action: z.literal('update'),
                         element: z.discriminatedUnion('partOf', [
                             z.object({
                                 partOf: z.literal('tables'),
@@ -98,26 +119,26 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                 ]),
                 response: {
                     200: AppSchemaSchema,
-                    400: z.object({
-                        error: z.string(),
-                        message: z.string(),
-                        details: z.any().optional()
-                    })
+                    404: ErrorResponseSchema
                 }
             }
         },
-        async request => {
+        async (request, reply) => {
             const { appId } = request.params;
-            const schema = await getSchema(appId);
+            const schema = await dataService.getSchema(appId);
+
+            if (!schema) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                });
+            }
 
             switch (request.body.action) {
                 case 'add':
                     const addEl = request.body.element;
 
-                    if (addEl.partOf === 'tables') {
-                        validateTableKeys(addEl.element as AppTable);
-                        schema.tables.push(addEl.element as AppTable);
-                    } else if (addEl.partOf === 'views') {
+                    if (addEl.partOf === 'views') {
                         schema.views.push(addEl.element as AppView);
                     } else if (addEl.partOf === 'fields' && addEl.parentId) {
                         const oldFieldsLength =
@@ -141,7 +162,7 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                         schema.tables = schema.tables.map(table => {
                             if (table.id === addEl.parentId) {
                                 table.fields.push(addEl.element as AppField);
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                             }
 
                             return table;
@@ -156,8 +177,7 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(schema);
                 case 'update':
                     const updateEl = request.body.element;
 
@@ -165,7 +185,7 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                         validateTableKeys(updateEl.element as AppTable);
                         schema.tables = schema.tables.map(table => {
                             if (table.id === updateEl.element.id) {
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 return updateEl.element as AppTable;
                             }
 
@@ -190,7 +210,7 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                                     );
                                 }
 
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = updatedFields;
                             }
 
@@ -210,15 +230,14 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(schema);
                 case 'delete':
                     const delEl = request.body.element;
 
                     if (delEl.partOf === 'tables') {
                         schema.tables = schema.tables.filter(table => {
                             if (table.id === delEl.elementId) {
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 return false;
                             }
 
@@ -250,7 +269,7 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                                     );
                                 }
 
-                                validatorCache.delete(`${appId}:${table.id}`);
+                                dataService.validatorCache.delete(`${appId}:${table.id}`);
                                 table.fields = remainingFields;
                             }
 
@@ -268,8 +287,7 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(schema);
                 case 'reorder':
                     const reoEl = request.body.element;
                     const { oldIndex, newIndex } = request.body;
@@ -296,11 +314,10 @@ const plugin: FastifyPluginAsyncZod<SchemaPluginOptions> = async (
                         });
                     }
 
-                    schemaCache.delete(appId);
-                    return sConnector.saveSchema!(appId, schema);
+                    return dataService.setSchema(schema);
             }
 
-            return getSchema(request.params.appId);
+            return dataService.getSchema(request.params.appId);
         }
     );
 };

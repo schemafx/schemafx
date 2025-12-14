@@ -1,4 +1,3 @@
-import mock_data from './mock_data.json' with { type: 'json' };
 import {
     Connector,
     type AppSchema,
@@ -6,7 +5,7 @@ import {
     type AppTable,
     ConnectorTableCapability
 } from '../types.js';
-import inferTable from '../utils/inferTable.js';
+import { inferTable } from '../utils/dataUtils.js';
 
 export default class MemoryConnector extends Connector {
     schemas: Map<string, AppSchema> = new Map();
@@ -36,67 +35,46 @@ export default class MemoryConnector extends Connector {
         return {};
     }
 
-    async getSchema(appId: string) {
-        let schema = this.schemas.get(appId);
-
-        if (!schema) {
-            schema = { ...mock_data } as unknown as AppSchema;
-            await this.saveSchema(appId, schema);
-        }
-
-        return schema;
-    }
-
-    async saveSchema(appId: string, schema: AppSchema) {
-        this.schemas.set(appId, schema);
-        return schema;
-    }
-
-    async deleteSchema(appId: string) {
-        this.schemas.delete(appId);
-    }
-
     async getData(table: AppTable) {
         return [...(this.tables.get(table.path[0]) ?? [])];
     }
 
-    async addRow(table: AppTable, row?: AppTableRow) {
+    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         const data = await this.getData(table);
-        if (!row) return data;
+        if (!row) return;
 
         data.push(row);
         this.tables.set(table.path[0], data);
-
-        return data;
     }
 
-    async updateRow(table: AppTable, key?: Record<string, unknown>, row?: AppTableRow) {
+    async updateRow(
+        table: AppTable,
+        auth?: string,
+        key?: Record<string, unknown>,
+        row?: AppTableRow
+    ) {
         const data = await this.getData(table);
 
-        if (!key || !row) return data;
+        if (!key || !row) return;
 
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
-        if (rowIndex === -1) return data;
+        if (rowIndex === -1) return;
 
         data[rowIndex] = { ...data[rowIndex], ...row };
         this.tables.set(table.path[0], data);
-
-        return data;
     }
 
-    async deleteRow(table: AppTable, key?: Record<string, unknown>) {
+    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
         const data = await this.getData(table);
 
-        if (!key) return data;
+        if (!key) return;
 
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
-        if (rowIndex === -1) return data;
+        if (rowIndex === -1) return;
 
         data.splice(rowIndex, 1);
         this.tables.set(table.path[0], data);
-
-        return data;
     }
 }

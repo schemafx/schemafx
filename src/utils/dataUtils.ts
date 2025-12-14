@@ -1,5 +1,60 @@
 import { randomUUID } from 'node:crypto';
-import { AppFieldType, type AppTableRow, type AppTable, type AppField } from '../types.js';
+import { type AppField, AppFieldType, type AppTableRow, type AppTable } from '../types.js';
+import { decrypt, encrypt } from './encryption.js';
+
+export function encodeRow(
+    row: Record<string, unknown>,
+    table: AppTable,
+    encryptionKey?: string
+): Record<string, unknown> {
+    if (!encryptionKey) return row;
+    const processedRow = { ...row };
+
+    for (const field of table.fields) {
+        if (
+            field.encrypted &&
+            (field.type === AppFieldType.Text || field.type === AppFieldType.JSON) &&
+            processedRow[field.id] !== undefined &&
+            processedRow[field.id] !== null
+        ) {
+            let valueToEncrypt = processedRow[field.id];
+            if (field.type === AppFieldType.JSON) valueToEncrypt = JSON.stringify(valueToEncrypt);
+
+            processedRow[field.id] = encrypt(String(valueToEncrypt), encryptionKey);
+        }
+    }
+
+    return processedRow;
+}
+
+export function decodeRow(
+    row: Record<string, unknown>,
+    table: AppTable,
+    encryptionKey?: string
+): Record<string, unknown> {
+    if (!encryptionKey) return row;
+    const processedRow = { ...row };
+
+    for (const field of table.fields) {
+        let value = processedRow[field.id];
+
+        if (
+            field.encrypted &&
+            value !== undefined &&
+            value !== null &&
+            typeof value === 'string' &&
+            (field.type === AppFieldType.Text || field.type === AppFieldType.JSON)
+        ) {
+            const decrypted = decrypt(value, encryptionKey);
+            if (field.type === AppFieldType.JSON) value = JSON.parse(decrypted);
+            else value = decrypted;
+
+            processedRow[field.id] = value;
+        }
+    }
+
+    return processedRow;
+}
 
 /**
  * Infer a Table Schema from data.
@@ -9,7 +64,7 @@ import { AppFieldType, type AppTableRow, type AppTable, type AppField } from '..
  * @param connectorId Id of the Connector.
  * @returns Inferred Table Schema.
  */
-export default function inferTable(
+export function inferTable(
     name: string,
     path: string[],
     data: AppTableRow[],

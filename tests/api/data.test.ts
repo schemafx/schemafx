@@ -180,7 +180,7 @@ describe('Data API', () => {
     });
 
     it('should handle recursive relationship max depth', async () => {
-        await connector.saveSchema!('tree', {
+        await app.dataService.setSchema({
             id: 'tree',
             name: 'Tree',
             tables: [
@@ -242,7 +242,7 @@ describe('Data API', () => {
     });
 
     it('should handle invalid connector', async () => {
-        await connector.saveSchema!('bad-connector-app', {
+        await app.dataService.setSchema({
             id: 'bad-connector-app',
             name: 'Bad App',
             tables: [
@@ -278,7 +278,7 @@ describe('Data API', () => {
     });
 
     it('should handle nested actions (Process type)', async () => {
-        await connector.saveSchema!('process-app', {
+        await app.dataService.setSchema({
             id: 'process-app',
             name: 'Process App',
             tables: [
@@ -334,7 +334,7 @@ describe('Data API', () => {
     });
 
     it('should handle recursion depth limit', async () => {
-        await connector.saveSchema!('recursion-app', {
+        await app.dataService.setSchema({
             id: 'recursion-app',
             name: 'Recursion App',
             tables: [
@@ -387,12 +387,16 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
 
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
-            connectorOpts: {
-                schemaConnector: memConnector.id,
-                connectors: {
-                    mem: memConnector,
-                    limited: limitedConnector
-                }
+            dataServiceOpts: {
+                schemaConnector: {
+                    connector: memConnector.id,
+                    path: ['schemas']
+                },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
+                },
+                connectors: [memConnector, limitedConnector]
             }
         });
 
@@ -420,11 +424,11 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
             views: []
         };
 
-        await memConnector.saveSchema('limited-app', schema as unknown as AppSchema);
+        await app.dataService.setSchema(schema);
 
         const response = await server.inject({
             method: 'GET',
-            url: `/api/apps/limited-app/data/users?query=${encodeURIComponent(
+            url: `/api/apps/${schema.id}/data/${schema.tables[0].id}?query=${encodeURIComponent(
                 JSON.stringify({
                     filters: [
                         { field: 'age', operator: QueryFilterOperator.GreaterThan, value: 28 }
@@ -441,7 +445,7 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
 
         const response2 = await server.inject({
             method: 'GET',
-            url: `/api/apps/limited-app/data/users?query=${encodeURIComponent(
+            url: `/api/apps/${schema.id}/data/${schema.tables[0].id}?query=${encodeURIComponent(
                 JSON.stringify({
                     filters: [
                         { field: 'age', operator: QueryFilterOperator.GreaterThan, value: 20 }

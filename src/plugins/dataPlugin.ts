@@ -1,42 +1,26 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import {
-    type AppSchema,
-    type AppTableRow,
-    AppTableRowSchema,
-    TableQueryOptionsSchema,
-    AppActionType,
-    type Connector
-} from '../types.js';
-import { zodFromTable, extractKeys, tableQuerySchema } from '../utils/schemaUtils.js';
-import {
-    createDuckDBInstance,
-    ingestStreamToDuckDB,
-    buildSQLQuery,
-    ingestDataToDuckDB
-} from '../utils/duckdb.js';
-import { LRUCache } from 'lru-cache';
+import { AppTableRowSchema, TableQueryOptionsSchema } from '../types.js';
+import { tableQuerySchema } from '../utils/fastifyUtils.js';
 import type { FastifyReply } from 'fastify';
-import type { DuckDBValue } from '@duckdb/node-api';
-import knex from 'knex';
+import type DataService from '../services/DataService.js';
 
-const qb = knex({ client: 'pg' });
-
-export type DataPluginOptions = {
-    connectors: Record<string, Connector>;
-    getSchema: (appId: string) => Promise<AppSchema>;
-    validatorCache: LRUCache<string, z.ZodTypeAny>;
-    maxRecursiveDepth?: number;
-};
-
-const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
-    fastify,
-    { connectors, getSchema, validatorCache, maxRecursiveDepth }
-) => {
-    const MAX_DEPTH = maxRecursiveDepth ?? 100;
-
+const plugin: FastifyPluginAsyncZod<{
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
     async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
-        const schema = await getSchema(appId);
+        const schema = await dataService.getSchema(appId);
+
+        if (!schema) {
+            return {
+                schema,
+                response: reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                })
+            };
+        }
+
         const table = schema.tables.find(table => table.id === tableId);
 
         if (!table) {
@@ -51,7 +35,7 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
         }
 
         const connectorName = table.connector;
-        const connector = connectors[connectorName];
+        const connector = dataService.connectors[connectorName];
 
         if (!connector) {
             return {
@@ -76,62 +60,22 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
             schema: tableQuerySchema
         },
         async (request, reply) => {
-            const { appId, tableId } = request.params;
-            const { query: queryStr } = request.query;
-
-            const { response, success, connector, table } = await handleTable(
-                appId,
-                tableId,
+            const { response, success, table } = await handleTable(
+                request.params.appId,
+                request.params.tableId,
                 reply
             );
+
             if (!success || !table) return response;
 
             let query;
-            if (queryStr) {
-                query = JSON.parse(queryStr);
+            if (request.query.query) {
+                query = JSON.parse(request.query.query);
                 const parsed = await TableQueryOptionsSchema.parseAsync(query);
                 query = parsed;
             }
 
-            if (!connector.getData && !connector.getDataStream) return [];
-
-            const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
-            const dbInstance = await createDuckDBInstance();
-            const connection = await dbInstance.connect();
-
-            if (connector.getDataStream) {
-                await ingestStreamToDuckDB(
-                    connection,
-                    await connector.getDataStream(table),
-                    table,
-                    tempTableName
-                );
-            } else {
-                await ingestDataToDuckDB(
-                    connection,
-                    await connector.getData!(table),
-                    table,
-                    tempTableName
-                );
-            }
-
-            const { sql, params } = buildSQLQuery(tempTableName, query || {});
-            const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
-            const rows = await reader.getRows();
-
-            const result = rows.map(row => {
-                const obj: Record<string, unknown> = {};
-                table.fields.forEach((field, index) => {
-                    obj[field.id] = row[index];
-                });
-
-                return obj;
-            });
-
-            await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
-            connection.closeSync();
-
-            return result;
+            return dataService.getData(table, query);
         }
     );
 
@@ -166,70 +110,13 @@ const plugin: FastifyPluginAsyncZod<DataPluginOptions> = async (
 
             if (!success || !table || !connector) return response;
 
-            const keyFields = table.fields.filter(f => f.isKey).map(f => f.id);
+            await dataService.executeAction({
+                table,
+                actId: actionId,
+                rows
+            });
 
-            async function executeAction(
-                actId: string,
-                currentRows: AppTableRow[],
-                depth: number
-            ): Promise<unknown> {
-                if (depth > MAX_DEPTH) {
-                    throw new Error('Max recursion depth exceeded.');
-                }
-
-                const action = table!.actions?.find(a => a.id === actId);
-                if (!action) throw new Error(`Action ${actId} not found.`);
-
-                switch (action.type) {
-                    case AppActionType.Add: {
-                        const validator = zodFromTable(table!, appId, validatorCache);
-                        for (const row of currentRows) {
-                            const rowResult = await validator.parseAsync(row);
-                            await connector?.addRow?.(table, rowResult as Record<string, unknown>);
-                        }
-
-                        return connector?.getData?.(table) || [];
-                    }
-                    case AppActionType.Update: {
-                        const validator = zodFromTable(table!, appId, validatorCache);
-                        for (const row of currentRows) {
-                            const rowData = await validator.parseAsync(row);
-                            const key = extractKeys(row, keyFields);
-                            if (Object.keys(key).length === 0) continue;
-
-                            await connector?.updateRow?.(
-                                table,
-                                key,
-                                rowData as Record<string, unknown>
-                            );
-                        }
-
-                        return connector?.getData?.(table) || [];
-                    }
-                    case AppActionType.Delete: {
-                        for (const row of currentRows) {
-                            const key = extractKeys(row, keyFields);
-                            if (Object.keys(key).length === 0) continue;
-
-                            await connector?.deleteRow?.(table, key);
-                        }
-
-                        return connector?.getData?.(table) || [];
-                    }
-                    case AppActionType.Process: {
-                        const subActions = (action.config?.actions as string[]) || [];
-                        let lastResult;
-
-                        for (const subActionId of subActions) {
-                            lastResult = await executeAction(subActionId, currentRows, depth + 1);
-                        }
-
-                        return lastResult;
-                    }
-                }
-            }
-
-            return executeAction(actionId, rows, 0);
+            return dataService.getData(table);
         }
     );
 };

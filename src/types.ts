@@ -19,6 +19,7 @@ export type AppField = {
     type: AppFieldType;
     isRequired?: boolean;
     isKey?: boolean;
+    encrypted?: boolean;
     referenceTo?: string | null;
     minLength?: number | null;
     maxLength?: number | null;
@@ -38,6 +39,7 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
         type: z.enum(Object.values(AppFieldType)),
         isRequired: z.boolean().default(true).optional(),
         isKey: z.boolean().default(false).optional(),
+        encrypted: z.boolean().default(false).optional(),
 
         // Reference Constraints
         referenceTo: z.string().nullable().optional(),
@@ -85,6 +87,7 @@ export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     connector: z.string().min(1),
+    connectionId: z.string().optional(),
     path: z.array(z.string()).default([]),
     fields: z.array(AppFieldSchema),
     actions: z.array(AppActionSchema).default([])
@@ -119,6 +122,15 @@ export const AppSchemaSchema = z.object({
 });
 
 export type AppSchema = z.infer<typeof AppSchemaSchema>;
+
+export const AppConnectionSchema = z.object({
+    id: z.string(),
+    name: z.string().min(1),
+    connector: z.string().min(1),
+    content: z.string().min(1)
+});
+
+export type AppConnection = z.infer<typeof AppConnectionSchema>;
 
 export enum QueryFilterOperator {
     Equals = 'eq',
@@ -176,81 +188,91 @@ export abstract class Connector {
     /**
      * List available tables.
      * @param path Path to retrieve from.
+     * @param auth Auth.
      * @returns List of available tables.
      */
-    abstract listTables(path: string[]): Promise<ConnectorTable[]>;
+    abstract listTables(path: string[], auth?: string): Promise<ConnectorTable[]>;
 
     /**
      * Get a Table Schema from a path.
      * @param path Path to the Table.
+     * @param auth Auth.
      * @returns Table Schema.
      */
-    abstract getTable(path: string[]): Promise<AppTable>;
+    abstract getTable(path: string[], auth?: string): Promise<AppTable>;
+
+    /**
+     * Performs the authorization exchange using the provided payload.
+     * @param body - A key-value object containing the credentials or payload required for authorization.
+     */
+    authorize?(body: Record<string, unknown>): Promise<{ name: string; content: string }>;
+
+    /** Generates the URL required to initiate an OAuth authorization flow. */
+    getAuthUrl?(): Promise<string>;
+
+    /**
+     * Revokes or invalidates the provided authentication credentials.
+     * @param auth - The authentication token or string identifier to be revoked.
+     */
+    revokeAuth?(auth: string): Promise<void>;
+
+    /**
+     * Validates that the provided credentials work for a specific table or context.
+     * @param table - The `AppTable` context object representing the resource being accessed.
+     * @param auth - The authentication token to test.
+     */
+    testAuth?(table: AppTable, auth: string): Promise<string | undefined>;
 
     /**
      * Get the capabilities of the connector.
      * @param table Table to get capabilities for.
+     * @param auth Auth.
      * @returns Connector Capabilities.
      */
-    getCapabilities?(table: AppTable): Promise<ConnectorCapabilities>;
-
-    /**
-     * Retrieve a Schema.
-     * @param appId Id of the Application.
-     * @returns Application Schema.
-     */
-    getSchema?(appId: string): Promise<AppSchema>;
-
-    /**
-     * Save an updated Schema.
-     * @param appId Id of the Application.
-     * @param schema Updated Schema to save.
-     * @returns Application Schema.
-     */
-    saveSchema?(appId: string, schema: AppSchema): Promise<AppSchema>;
-
-    /**
-     * Delete the Schema for an Application.
-     * @param appId Id of the Application.
-     */
-    deleteSchema?(appId: string): Promise<void>;
+    getCapabilities?(table: AppTable, auth?: string): Promise<ConnectorCapabilities>;
 
     /**
      * Get data from a Table.
      * @param table Table.
+     * @param auth Auth.
      * @param query Query Options.
      */
-    getData?(table: AppTable, query?: TableQueryOptions): Promise<AppTableRow[]>;
+    getData?(table: AppTable, auth?: string, query?: TableQueryOptions): Promise<AppTableRow[]>;
 
     /**
      * Get data from a Table as a Stream.
      * @param table Table.
+     * @param auth Auth.
      */
-    getDataStream?(table: AppTable): Promise<Readable>;
+    getDataStream?(table: AppTable, auth?: string): Promise<Readable>;
 
     /**
      * Add a new Row to the Table.
      * @param table Table.
+     * @param auth Auth.
      * @param row Table Row.
      */
-    addRow?(table: AppTable, row?: AppTableRow): Promise<AppTableRow[]>;
+    addRow?(table: AppTable, auth?: string, row?: AppTableRow): Promise<void>;
 
     /**
      * Update a Row from the Table.
      * @param table Table.
+     * @param auth Auth.
      * @param key Key of the Row.
      * @param row Table Row.
      */
     updateRow?(
         table: AppTable,
+        auth?: string,
         key?: Record<string, unknown>,
         row?: AppTableRow
-    ): Promise<AppTableRow[]>;
+    ): Promise<void>;
 
     /**
      * Delete a Row from the Table.
      * @param table Table.
+     * @param auth Auth.
      * @param key Key of the Row.
      */
-    deleteRow?(table: AppTable, key?: Record<string, unknown>): Promise<AppTableRow[]>;
+    deleteRow?(table: AppTable, auth?: string, key?: Record<string, unknown>): Promise<void>;
 }

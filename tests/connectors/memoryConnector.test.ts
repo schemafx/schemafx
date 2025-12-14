@@ -15,31 +15,6 @@ describe('MemoryConnector', () => {
         expect(connector.id).toBe(connectorId);
     });
 
-    it('should save and get schema', async () => {
-        const schema = {
-            id: 'app1',
-            name: 'App 1',
-            tables: [],
-            views: []
-        };
-
-        await connector.saveSchema!('app1', schema);
-        const result = await connector.getSchema!('app1');
-        expect(result).toEqual(schema);
-    });
-
-    // Current API adds mock data by default.
-    /*it('should throw when getting non-existent schema', async () => {
-        await expect(connector.getSchema!('unknown')).rejects.toThrow();
-    });
-
-    it('should delete schema', async () => {
-        const schema = { id: 'app1', name: 'App 1', tables: [], views: [] };
-        await connector.saveSchema!('app1', schema);
-        await connector.deleteSchema!('app1');
-        await expect(connector.getSchema!('app1')).rejects.toThrow();
-    });*/
-
     describe('Data Operations', () => {
         const table: AppTable = {
             id: 'users',
@@ -59,36 +34,32 @@ describe('MemoryConnector', () => {
 
         it('should add row', async () => {
             const row = { id: 1, name: 'User 1' };
-            const result = await connector.addRow!(table, row);
-            expect(result).toHaveLength(1);
-            expect(result[0]).toEqual(row);
+            await connector.addRow!(table, undefined, row);
+
+            const data = await connector.getData!(table);
+            expect(data).toHaveLength(1);
+            expect(data[0]).toEqual(row);
         });
 
         it('should get data', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.addRow!(table, { id: 2, name: 'User 2' });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.addRow!(table, undefined, { id: 2, name: 'User 2' });
 
             const data = await connector.getData!(table);
             expect(data).toHaveLength(2);
         });
 
         it('should update row', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            const updated = await connector.updateRow!(
-                table,
-                { id: 1 },
-                { id: 1, name: 'Updated' }
-            );
-
-            expect(updated[0].name).toBe('Updated');
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.updateRow!(table, undefined, { id: 1 }, { id: 1, name: 'Updated' });
 
             const data = await connector.getData!(table);
             expect(data[0].name).toBe('Updated');
         });
 
         it('should delete row', async () => {
-            await connector.addRow!(table, { id: 1, name: 'User 1' });
-            await connector.deleteRow!(table, { id: 1 });
+            await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
+            await connector.deleteRow!(table, undefined, { id: 1 });
             const data = await connector.getData!(table);
             expect(data).toHaveLength(0);
         });
