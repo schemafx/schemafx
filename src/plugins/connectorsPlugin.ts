@@ -80,7 +80,8 @@ const plugin: FastifyPluginAsyncZod<{
                     connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
                 }),
                 body: z.object({
-                    path: z.array(z.string()).meta({ description: 'Path to query tables from' })
+                    path: z.array(z.string()).meta({ description: 'Path to query tables from' }),
+                    connectionId: z.string().optional()
                 }),
                 response: {
                     200: z
@@ -101,7 +102,10 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            return connector.listTables(request.body.path);
+            return connector.listTables(
+                request.body.path,
+                (await dataService.getConnection(request.body.connectionId))?.content
+            );
         }
     );
 
@@ -209,7 +213,7 @@ const plugin: FastifyPluginAsyncZod<{
                 }),
                 body: z.object({
                     path: z.array(z.string()).meta({ description: 'Path to the table' }),
-                    connection: z.string().optional(),
+                    connectionId: z.string().optional(),
                     appId: z
                         .string()
                         .min(1)
@@ -233,10 +237,10 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            const { path, appId, connection } = request.body;
-            const auth = await dataService.getConnection(connection);
+            const { path, appId, connectionId } = request.body;
+            const auth = await dataService.getConnection(connectionId);
             const table = await connector.getTable(path, auth?.content);
-            table.connectionId = connection;
+            table.connectionId = connectionId;
             validateTableKeys(table);
 
             let schema: AppSchema | undefined;
