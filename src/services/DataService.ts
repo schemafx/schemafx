@@ -23,6 +23,7 @@ import type { DuckDBValue } from '@duckdb/node-api';
 import knex from 'knex';
 import { extractKeys } from '../utils/schemaUtils.js';
 import { decodeRow, encodeRow } from '../utils/dataUtils.js';
+import { randomUUID } from 'crypto';
 
 const qb = knex({ client: 'pg' });
 
@@ -107,7 +108,7 @@ export default class DataService {
         }
 
         this.schemaTable = tableFromZod(AppSchemaSchema, {
-            id: '',
+            id: randomUUID(),
             name: '',
             primaryKey: 'id',
             ...schemaConnector,
@@ -132,7 +133,7 @@ export default class DataService {
 
         this.connectionsConnection = connectionsConnection;
         this.connectionsTable = tableFromZod(AppConnectionSchema, {
-            id: '',
+            id: randomUUID(),
             name: '',
             primaryKey: 'id',
             ...connectionsConnector,
