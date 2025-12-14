@@ -194,12 +194,13 @@ export default class DataService {
     }
 
     async setConnection(connection: AppConnection) {
+        const existingConnection = await this.getConnection(connection.id);
         this.connectionsCache.set(connection.id, connection);
 
         this._executeAction({
             table: this.connectionsTable,
             auth: this.connectionsConnection,
-            actId: 'update',
+            actId: existingConnection ? 'update' : 'add',
             rows: [connection]
         });
 
