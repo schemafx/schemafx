@@ -33,7 +33,7 @@ const app = new SchemaFX({
 
 const devAppId = '123';
 if (!(await app.dataService.getSchema(devAppId))) {
-    app.dataService.setSchema({
+    await app.dataService.setSchema({
         id: devAppId,
         name: 'Demo CRM',
         tables: [
