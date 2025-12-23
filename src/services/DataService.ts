@@ -241,11 +241,12 @@ export default class DataService {
     }
 
     async setSchema(schema: AppSchema) {
+        const hasSchema = await this.getSchema(schema.id);
         this.schemaCache.set(schema.id, schema);
 
         this.executeAction({
             table: this.schemaTable,
-            actId: 'update',
+            actId: hasSchema ? 'update' : 'add',
             rows: [schema]
         });
 

@@ -11,17 +11,18 @@ const dbPath = path.join(process.cwd(), 'database.json');
 
 const memoryConnector = new MemoryConnector('Memory', 'memory');
 const fileConnector = new FileConnector('File System', dbPath, 'file');
+const defaultConnector = fileConnector.id;
 const app = new SchemaFX({
     jwtOpts: {
         secret: 'my-very-secret'
     },
     dataServiceOpts: {
         schemaConnector: {
-            connector: fileConnector.id,
+            connector: defaultConnector,
             path: ['schemas']
         },
         connectionsConnector: {
-            connector: fileConnector.id,
+            connector: defaultConnector,
             path: ['connections']
         },
         connectors: [memoryConnector, fileConnector],
@@ -41,7 +42,7 @@ if (!(await app.dataService.getSchema(devAppId))) {
                 id: 'customers',
                 name: 'Customers',
                 path: ['customers'],
-                connector: 'memory',
+                connector: defaultConnector,
                 fields: [
                     {
                         id: '_id',
@@ -70,7 +71,7 @@ if (!(await app.dataService.getSchema(devAppId))) {
                 id: 'orders',
                 name: 'Orders',
                 path: ['orders'],
-                connector: 'memory',
+                connector: defaultConnector,
                 fields: [
                     {
                         id: '_id',
