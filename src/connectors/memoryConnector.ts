@@ -31,18 +31,18 @@ export default class MemoryConnector extends Connector {
         return inferTable(tableId, path, this.tables.get(tableId) || [], this.id);
     }
 
-    async getCapabilities() {
+    override async getCapabilities() {
         // In-Memory capabilities only.
         // Default capability handler.
         return {};
     }
 
-    async getData(table: AppTable) {
+    override async getData(table: AppTable) {
         if (!table.path[0]) return [];
         return [...(this.tables.get(table.path[0]) ?? [])];
     }
 
-    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
+    override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         if (!table.path[0]) return;
         if (!row) return;
 
@@ -51,7 +51,7 @@ export default class MemoryConnector extends Connector {
         this.tables.set(table.path[0], data);
     }
 
-    async updateRow(
+    override async updateRow(
         table: AppTable,
         auth?: string,
         key?: Record<string, unknown>,
@@ -68,7 +68,7 @@ export default class MemoryConnector extends Connector {
         this.tables.set(table.path[0], data);
     }
 
-    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+    override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
         if (!table.path[0] || !key) return;
 
         const data = await this.getData(table);

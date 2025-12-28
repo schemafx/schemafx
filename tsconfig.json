@@ -16,7 +16,8 @@
         "typeRoots": ["node_modules/@types", "src/types"],
         "types": ["node"],
         "verbatimModuleSyntax": true,
-        "noUncheckedIndexedAccess": true
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true
     },
     "include": ["src", "src/**/*.json"],
     "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.ts"]

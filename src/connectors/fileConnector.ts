@@ -44,7 +44,7 @@ export default class FileConnector extends Connector {
         return inferTable(tableId, path, db.tables[tableId] || [], this.id);
     }
 
-    async getCapabilities() {
+    override async getCapabilities() {
         // In-Memory capabilities only.
         // Default capability handler.
         return {};
@@ -70,14 +70,14 @@ export default class FileConnector extends Connector {
         await writeFile(this.filePath, JSON.stringify(db, null, 4), 'utf-8');
     }
 
-    async getData(table: AppTable) {
+    override async getData(table: AppTable) {
         if (!table.path[0]) return [];
 
         const db = await this._readDB();
         return db.tables[table.path[0]] || [];
     }
 
-    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
+    override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         if (!table.path[0] || !row) return;
 
         const db = await this._readDB();
@@ -87,7 +87,7 @@ export default class FileConnector extends Connector {
         await this._writeDB(db);
     }
 
-    async updateRow(
+    override async updateRow(
         table: AppTable,
         auth?: string,
         key?: Record<string, unknown>,
@@ -107,7 +107,7 @@ export default class FileConnector extends Connector {
         await this._writeDB(db);
     }
 
-    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+    override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
         if (!table.path[0] || !key) return;
 
         const db = await this._readDB();
