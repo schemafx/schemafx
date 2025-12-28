@@ -212,7 +212,7 @@ export default class DataService {
         const connection = await this.getConnection(connectionId);
         if (!connection) return this.connectionsCache.delete(connectionId);
 
-        this._executeAction({
+        await this._executeAction({
             table: this.connectionsTable,
             auth: this.connectionsConnection,
             actId: 'delete',
@@ -258,7 +258,7 @@ export default class DataService {
         const schema = await this.getSchema(appId);
         if (!schema) return this.schemaCache.delete(appId);
 
-        this.executeAction({
+        await this.executeAction({
             table: this.schemaTable,
             actId: 'delete',
             rows: [schema]
