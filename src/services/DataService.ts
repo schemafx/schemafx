@@ -9,7 +9,7 @@ import {
     AppSchemaSchema,
     QueryFilterOperator,
     AppConnectionSchema,
-    AppConnection
+    type AppConnection
 } from '../types.js';
 import type { z } from 'zod';
 import { type AppTableFromZodOptions, tableFromZod, zodFromTable } from '../utils/zodUtils.js';

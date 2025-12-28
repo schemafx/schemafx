@@ -14,7 +14,8 @@
         "declaration": true,
         "declarationMap": true,
         "typeRoots": ["node_modules/@types", "src/types"],
-        "types": ["node"]
+        "types": ["node"],
+        "verbatimModuleSyntax": true
     },
     "include": ["src", "src/**/*.json"],
     "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.test.ts"]
