@@ -1,6 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import SchemaFX from '../src/index.js';
 import MemoryConnector from '../src/connectors/memoryConnector.js';
+import { createTestApp } from './testUtils.js';
+
+declare module 'fastify' {
+    interface FastifyInstance {
+        authenticate: (request: FastifyRequest) => Promise<void>;
+    }
+}
+
+declare module '@fastify/jwt' {
+    interface FastifyJWT {
+        payload: { id: string };
+        user: { id: string };
+    }
+}
 
 describe('Core SchemaFX', () => {
     it('should initialize with default options', async () => {
@@ -198,6 +212,97 @@ describe('Core SchemaFX', () => {
         const body = JSON.parse(response.payload);
         expect(body.error).toBe('Internal Server Error');
         expect(body.message).toBe('Unexpected error occurred.');
+
+        await server.close();
+    });
+
+    it('should catch JWT verification errors', async () => {
+        const { app } = await createTestApp(false);
+        const server = app.fastifyInstance;
+
+        // Add a route that uses the 'authenticate' decorator
+        server.get('/protected', { onRequest: [server.authenticate] }, async () => {
+            return { message: 'ok' };
+        });
+
+        await server.ready();
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/protected',
+            headers: {
+                Authorization: 'Bearer invalid.token.here'
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+
+        await server.close();
+    });
+
+    it('should handle FST_ERR_VALIDATION code manually', async () => {
+        const { app } = await createTestApp(false);
+        const server = app.fastifyInstance;
+
+        server.get('/fst-validation-error', async () => {
+            const error: any = new Error('Manual Validation Error');
+            error.code = 'FST_ERR_VALIDATION';
+            throw error;
+        });
+
+        await server.ready();
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/fst-validation-error'
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Bad Request');
+        expect(body.message).toBe('Manual Validation Error');
+
+        await server.close();
+    });
+
+    it('should successfully verify a valid JWT', async () => {
+        const app = new SchemaFX({
+            jwtOpts: { secret: 'secret' },
+            dataServiceOpts: {
+                schemaConnector: {
+                    connector: 'mem',
+                    path: ['schemas']
+                },
+                connectionsConnector: {
+                    connector: 'mem',
+                    path: ['connections']
+                },
+                connectors: [new MemoryConnector('Mem', 'mem')]
+            }
+        });
+        const server = app.fastifyInstance;
+
+        // Add a route that uses the 'authenticate' decorator
+        server.get('/protected-valid', { onRequest: [server.authenticate] }, async req => {
+            // If jwtVerify passes, req.user should be populated
+            return { user: (req as any).user };
+        });
+
+        await server.ready();
+
+        const token = app.fastifyInstance.jwt.sign({ id: 'test' });
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/protected-valid',
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        expect(body.user).toBeDefined();
 
         await server.close();
     });

@@ -181,4 +181,171 @@ describe('Schema Operations', () => {
         expect(table?.fields[0].id).toBe('name');
         expect(table?.fields[1].id).toBe('id');
     });
+
+    it('should return 404 for unknown app schema', async () => {
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/unknown-app/schema',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        expect(response.statusCode).toBe(404);
+    });
+
+    it('should return 404 for unknown app schema when updating', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/unknown-app/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'add',
+                element: {
+                    partOf: 'views',
+                    element: { id: 'view1', name: 'View 1', tableId: 't1', type: 'table' }
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(404);
+    });
+
+    it('should prevent updating field to remove all keys', async () => {
+        // The table 'users' has 'id' as Key.
+        // Try to update 'id' to not be a key.
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'update',
+                element: {
+                    partOf: 'fields',
+                    parentId: 'users',
+                    element: { id: 'id', name: 'ID', type: 'number', isKey: false }
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(500);
+
+        // Verify schema was NOT updated
+        const schema = await app.dataService.getSchema('app1');
+        const table = schema?.tables.find(t => t.id === 'users');
+        const idField = table?.fields.find(f => f.id === 'id');
+        expect(idField?.isKey).toBe(true);
+    });
+
+    it('should prevent deleting key field', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'delete',
+                element: {
+                    partOf: 'fields',
+                    parentId: 'users',
+                    elementId: 'id'
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(500);
+
+        // Verify field was NOT deleted
+        const schema = await app.dataService.getSchema('app1');
+        const table = schema?.tables.find(t => t.id === 'users');
+        const idField = table?.fields.find(f => f.id === 'id');
+        expect(idField).toBeDefined();
+    });
+
+    it('should delete a table', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'delete',
+                element: {
+                    partOf: 'tables',
+                    elementId: 'users'
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        expect(body.tables).toHaveLength(0);
+    });
+
+    it('should delete an action', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'delete',
+                element: {
+                    partOf: 'actions',
+                    parentId: 'users',
+                    elementId: 'add'
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        const table = body.tables.find((t: any) => t.id === 'users');
+        expect(table.actions.find((a: any) => a.id === 'add')).toBeUndefined();
+    });
+
+    it('should reorder actions', async () => {
+        // actions: add (0), update (1), delete (2)
+        // move delete to 0
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'reorder',
+                oldIndex: 2,
+                newIndex: 0,
+                element: {
+                    partOf: 'actions',
+                    parentId: 'users'
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        const table = body.tables.find((t: any) => t.id === 'users');
+        expect(table.actions[0].id).toBe('delete');
+    });
+
+    it('should reorder tables', async () => {
+        // Create another table to reorder
+        const schema = await app.dataService.getSchema('app1');
+        if (!schema) throw new Error('Schema not found');
+        schema.tables.push({ ...schema.tables[0], id: 'users2', name: 'Users 2' });
+        await app.dataService.setSchema(schema);
+
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/schema',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                action: 'reorder',
+                oldIndex: 1,
+                newIndex: 0,
+                element: {
+                    partOf: 'tables'
+                }
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        expect(body.tables[0].id).toBe('users2');
+    });
 });

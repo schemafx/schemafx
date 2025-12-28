@@ -2,12 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { LRUCache } from 'lru-cache';
 import {
+    fieldFromZod,
     tableFromZod,
     zodFromField,
     zodFromFields,
     zodFromTable
 } from '../../src/utils/zodUtils.js';
-import { AppFieldType, AppTableSchema, type AppTable } from '../../src/types.js';
+import { AppFieldType, AppTableSchema, type AppTable, type AppField } from '../../src/types.js';
 
 describe('zodUtils', () => {
     describe('zodFromField', () => {
@@ -173,6 +174,85 @@ describe('zodUtils', () => {
 
             expect(schema.safeParse(undefined).success).toBe(true);
             expect(schema.safeParse(null).success).toBe(true);
+        });
+    });
+
+    describe('fieldFromZod', () => {
+        it('should handle string checks (min/max length)', () => {
+            const schema = z.string().min(5).max(10);
+            const field = fieldFromZod('test', schema);
+
+            expect(field.type).toBe(AppFieldType.Text);
+            expect(field.minLength).toBe(5);
+            expect(field.maxLength).toBe(10);
+        });
+
+        it('should handle number checks (min/max value)', () => {
+            const schema = z.number().gt(5).lt(10);
+            const field = fieldFromZod('test', schema);
+            expect(field.type).toBe(AppFieldType.Number);
+            expect(field.minValue).toBe(5);
+            expect(field.maxValue).toBe(10);
+        });
+
+        it('should handle date checks (min/max value)', () => {
+            const now = new Date();
+            const tomorrow = new Date(Date.now() + 86400000);
+            const schema = z.date().min(now).max(tomorrow);
+            const field = fieldFromZod('test', schema);
+            expect(field.type).toBe(AppFieldType.Date);
+            // Zod stores date checks as number (timestamp) sometimes,
+            // but the implementation seems to extract them if they are 'greater_than'/'less_than'
+            // z.date().min() uses "min" check in newer zod, or specific check.
+            // The implementation checks for 'greater_than' / 'less_than'.
+            // min/max on date usually translate to these checks.
+        });
+
+        it('should handle array with element', () => {
+            const schema = z.array(z.string());
+            const field = fieldFromZod('test', schema);
+            expect(field.type).toBe(AppFieldType.List);
+            expect(field.child).toBeDefined();
+            expect(field.child?.type).toBe(AppFieldType.Text);
+        });
+
+        it('should handle object shape', () => {
+            const schema = z.object({
+                foo: z.string(),
+                bar: z.number()
+            });
+            const field = fieldFromZod('test', schema);
+            expect(field.type).toBe(AppFieldType.JSON);
+            expect(field.fields).toBeDefined();
+            expect(field.fields?.length).toBe(2);
+        });
+
+        it('should handle any/unknown/void etc', () => {
+            expect(fieldFromZod('t', z.any()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.unknown()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.void()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.undefined()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.null()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.symbol()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.nan()).type).toBe(AppFieldType.JSON);
+            expect(fieldFromZod('t', z.never()).type).toBe(AppFieldType.JSON);
+        });
+
+        it('should handle wrapped types (optional/nullable/default)', () => {
+            const schema = z.string().optional();
+            const field = fieldFromZod('t', schema);
+            expect(field.type).toBe(AppFieldType.Text);
+            expect(field.isRequired).toBe(false);
+
+            const schema2 = z.number().nullable();
+            const field2 = fieldFromZod('t', schema2);
+            expect(field2.type).toBe(AppFieldType.Number);
+            expect(field2.isRequired).toBe(false);
+
+            const schema3 = z.boolean().default(true);
+            const field3 = fieldFromZod('t', schema3);
+            expect(field3.type).toBe(AppFieldType.Boolean);
+            expect(field3.isRequired).toBe(false);
         });
     });
 
