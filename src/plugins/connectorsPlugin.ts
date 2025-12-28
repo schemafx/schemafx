@@ -240,6 +240,14 @@ const plugin: FastifyPluginAsyncZod<{
             const { path, appId, connectionId } = request.body;
             const auth = await dataService.getConnection(connectionId);
             const table = await connector.getTable(path, auth?.content);
+
+            if (!table) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                });
+            }
+
             table.connectionId = connectionId;
             validateTableKeys(table);
 

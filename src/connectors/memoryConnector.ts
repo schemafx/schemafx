@@ -13,8 +13,8 @@ export default class MemoryConnector extends Connector {
 
     async listTables(path: string[]) {
         if (path.length > 0) return [];
-        const tables = new Set<string>();
 
+        const tables = new Set<string>();
         for (const [tableId] of this.tables) tables.add(tableId);
 
         return Array.from(tables).map(tableId => ({
@@ -26,6 +26,8 @@ export default class MemoryConnector extends Connector {
 
     async getTable(path: string[]) {
         const tableId = path[0];
+        if (!tableId) return;
+
         return inferTable(tableId, path, this.tables.get(tableId) || [], this.id);
     }
 
@@ -36,13 +38,15 @@ export default class MemoryConnector extends Connector {
     }
 
     async getData(table: AppTable) {
+        if (!table.path[0]) return [];
         return [...(this.tables.get(table.path[0]) ?? [])];
     }
 
     async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
-        const data = await this.getData(table);
+        if (!table.path[0]) return;
         if (!row) return;
 
+        const data = await this.getData(table);
         data.push(row);
         this.tables.set(table.path[0], data);
     }
@@ -53,10 +57,9 @@ export default class MemoryConnector extends Connector {
         key?: Record<string, unknown>,
         row?: AppTableRow
     ) {
+        if (!table.path[0] || !key || !row) return;
+
         const data = await this.getData(table);
-
-        if (!key || !row) return;
-
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex === -1) return;
@@ -66,10 +69,9 @@ export default class MemoryConnector extends Connector {
     }
 
     async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+        if (!table.path[0] || !key) return;
+
         const data = await this.getData(table);
-
-        if (!key) return;
-
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex === -1) return;

@@ -159,7 +159,7 @@ export default class DataService {
 
         this.connectionsTable.fields[
             this.connectionsTable.fields.findIndex(f => f.id === 'content')
-        ].encrypted = true;
+        ]!.encrypted = true;
 
         this.encryptionKey = encryptionKey;
         this.maxRecursiveDepth = maxRecursiveDepth ?? 100;

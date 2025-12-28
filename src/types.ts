@@ -199,7 +199,7 @@ export abstract class Connector {
      * @param auth Auth.
      * @returns Table Schema.
      */
-    abstract getTable(path: string[], auth?: string): Promise<AppTable>;
+    abstract getTable(path: string[], auth?: string): Promise<AppTable | undefined>;
 
     /**
      * Performs the authorization exchange using the provided payload.
