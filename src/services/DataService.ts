@@ -15,6 +15,7 @@ import type { z } from 'zod';
 import { type AppTableFromZodOptions, tableFromZod, zodFromTable } from '../utils/zodUtils.js';
 import {
     buildSQLQuery,
+    convertDuckDBRowsToAppRows,
     createDuckDBInstance,
     ingestDataToDuckDB,
     ingestStreamToDuckDB
@@ -380,14 +381,17 @@ export default class DataService {
         const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
         const rows = await reader.getRows();
 
-        const result = rows.map(row => {
-            const obj: Record<string, unknown> = {};
-            table.fields.forEach((field, index) => {
-                obj[field.id] = row[index];
-            });
+        const result = convertDuckDBRowsToAppRows(
+            rows.map(row => {
+                const obj: Record<string, unknown> = {};
+                table.fields.forEach((field, index) => {
+                    obj[field.id] = row[index];
+                });
 
-            return decodeRow(obj, table, this.encryptionKey);
-        });
+                return decodeRow(obj, table, this.encryptionKey);
+            }),
+            table
+        );
 
         await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
         connection.closeSync();
