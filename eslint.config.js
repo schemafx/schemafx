@@ -1,23 +1,33 @@
+import gitignore from 'eslint-config-flat-gitignore';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import prettierPlugin from 'eslint-plugin-prettier';
-import prettier from 'prettier';
-import path from 'node:path';
 
 export default [
+    gitignore(),
     {
         files: ['src/**/*.{ts,tsx}'],
-        languageOptions: { parser: tsParser },
+        languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+                project: './tsconfig.json'
+            }
+        },
         plugins: {
             '@typescript-eslint': tsPlugin,
             prettier: prettierPlugin
         },
         rules: {
             ...tsPlugin.configs.recommended.rules,
-            'prettier/prettier': [
+            'prettier/prettier': 'error',
+            '@typescript-eslint/consistent-type-imports': [
                 'error',
-                await prettier.resolveConfig(path.resolve('./.prettierrc.json'))
+                {
+                    prefer: 'type-imports',
+                    fixStyle: 'inline-type-imports'
+                }
             ],
+            '@typescript-eslint/no-import-type-side-effects': 'error',
             ...prettierPlugin.configs.recommended.rules
         }
     }
