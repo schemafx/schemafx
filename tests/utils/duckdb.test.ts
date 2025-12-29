@@ -17,6 +17,29 @@ describe('DuckDB Utils', () => {
             expect(params).toEqual([]);
         });
 
+        it('should handle operators', () => {
+            const { sql } = buildSQLQuery('users', {
+                filters: [
+                    { field: 'eq', operator: QueryFilterOperator.Equals, value: 1 },
+                    { field: 'neq', operator: QueryFilterOperator.NotEqual, value: 1 },
+                    { field: 'gt', operator: QueryFilterOperator.GreaterThan, value: 1 },
+                    { field: 'gte', operator: QueryFilterOperator.GreaterThanOrEqualTo, value: 1 },
+                    { field: 'lt', operator: QueryFilterOperator.LowerThan, value: 1 },
+                    { field: 'lte', operator: QueryFilterOperator.LowerThanOrEqualTo, value: 1 },
+                    { field: 'co', operator: QueryFilterOperator.Contains, value: 1 }
+                ]
+            });
+
+            expect(sql).toContain('"eq" = ?');
+            expect(sql.includes('not "eq" = ?')).toBe(false);
+            expect(sql).toContain('not "neq" = ?');
+            expect(sql).toContain('"gt" > ?');
+            expect(sql).toContain('"gte" >= ?');
+            expect(sql).toContain('"lt" < ?');
+            expect(sql).toContain('"lte" <= ?');
+            expect(sql).toContain('"co" like ?');
+        });
+
         it('should handle filters with escaping', () => {
             const { sql, params } = buildSQLQuery('users', {
                 filters: [

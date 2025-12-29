@@ -76,6 +76,17 @@ describe('zodUtils', () => {
             expect(schema.safeParse(new Date('2024-01-01')).success).toBe(false);
         });
 
+        it('should generate date validator without start/end date', () => {
+            const schema = zodFromField({
+                id: 'date',
+                name: 'Date',
+                type: AppFieldType.Date
+            });
+
+            expect(schema.safeParse(new Date('2023-06-01')).success).toBe(true);
+            expect(schema.safeParse(0).success).toBe(false);
+        });
+
         it('should generate email validator', () => {
             const schema = zodFromField({
                 id: 'email',
@@ -103,8 +114,7 @@ describe('zodUtils', () => {
             const schema = zodFromField({
                 id: 'drop',
                 name: 'Drop',
-                type: AppFieldType.Dropdown,
-                options: []
+                type: AppFieldType.Dropdown
             });
 
             expect(schema.safeParse('a').success).toBe(false);
@@ -185,6 +195,12 @@ describe('zodUtils', () => {
             expect(field.type).toBe(AppFieldType.Text);
             expect(field.minLength).toBe(5);
             expect(field.maxLength).toBe(10);
+        });
+
+        it('should handle numbers', () => {
+            const schema = z.number();
+            const field = fieldFromZod('test', schema);
+            expect(field.type).toBe(AppFieldType.Number);
         });
 
         it('should handle number checks (min/max value)', () => {

@@ -177,7 +177,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(schema);
+                    break;
                 case 'update':
                     const updateEl = request.body.element;
 
@@ -203,6 +203,7 @@ const plugin: FastifyPluginAsyncZod<{
                                         ? (updateEl.element as AppField)
                                         : field
                                 );
+
                                 const hasKey = updatedFields.some(f => f.isKey);
                                 if (!hasKey) {
                                     throw new Error(
@@ -230,7 +231,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(schema);
+                    break;
                 case 'delete':
                     const delEl = request.body.element;
 
@@ -287,7 +288,7 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(schema);
+                    break;
                 case 'reorder':
                     const reoEl = request.body.element;
                     const { oldIndex, newIndex } = request.body;
@@ -314,10 +315,10 @@ const plugin: FastifyPluginAsyncZod<{
                         });
                     }
 
-                    return dataService.setSchema(schema);
+                    break;
             }
 
-            return dataService.getSchema(request.params.appId);
+            return dataService.setSchema(schema);
         }
     );
 };

@@ -99,19 +99,10 @@ export function fieldFromZod(id: string, schema: z.ZodType): AppField {
     let currentSchema: z.ZodType = schema;
 
     while (def.type === 'optional' || def.type === 'nullable' || def.type === 'default') {
-        if (def.type === 'optional' || def.type === 'nullable' || def.type === 'default') {
-            isRequired = false;
-        }
+        isRequired = false;
 
-        if ('innerType' in def) {
-            currentSchema = def.innerType as z.ZodType;
-            def = currentSchema.def;
-        } else if ('innerType' in currentSchema) {
-            currentSchema = currentSchema.innerType as z.ZodType;
-            def = currentSchema.def;
-        } else {
-            break;
-        }
+        currentSchema = (def as unknown as Record<string, z.ZodType>).innerType as z.ZodType;
+        def = currentSchema.def;
     }
 
     switch (def.type) {
@@ -121,89 +112,75 @@ export function fieldFromZod(id: string, schema: z.ZodType): AppField {
                     ? AppFieldType.Email
                     : AppFieldType.Text;
 
-            if (def.checks) {
-                for (const check of def.checks) {
-                    const checkDef =
-                        'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
+            if (!def.checks?.length) break;
 
-                    if (checkDef) {
-                        if (checkDef.check === 'min_length') {
-                            minLength = (checkDef as z.core.$ZodCheckMinLengthDef).minimum;
-                        }
+            for (const check of def.checks) {
+                const checkDef = check._zod.def;
 
-                        if (checkDef.check === 'max_length') {
-                            maxLength = (checkDef as z.core.$ZodCheckMaxLengthDef).maximum;
-                        }
-                    }
+                if (checkDef.check === 'min_length') {
+                    minLength = (checkDef as z.core.$ZodCheckMinLengthDef).minimum;
+                }
+
+                if (checkDef.check === 'max_length') {
+                    maxLength = (checkDef as z.core.$ZodCheckMaxLengthDef).maximum;
                 }
             }
+
             break;
         case 'number':
             type = AppFieldType.Number;
-            if (def.checks) {
-                for (const check of def.checks) {
-                    const checkDef =
-                        'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
+            if (!def.checks?.length) break;
 
-                    if (checkDef) {
-                        if (checkDef.check === 'greater_than') {
-                            minValue = (checkDef as z.core.$ZodCheckGreaterThanDef).value as number;
-                        }
+            for (const check of def.checks) {
+                const checkDef = check._zod.def;
 
-                        if (checkDef.check === 'less_than') {
-                            maxValue = (checkDef as z.core.$ZodCheckLessThanDef).value as number;
-                        }
-                    }
+                if (checkDef.check === 'greater_than') {
+                    minValue = (checkDef as z.core.$ZodCheckGreaterThanDef).value as number;
+                }
+
+                if (checkDef.check === 'less_than') {
+                    maxValue = (checkDef as z.core.$ZodCheckLessThanDef).value as number;
                 }
             }
+
             break;
         case 'boolean':
             type = AppFieldType.Boolean;
             break;
         case 'date':
             type = AppFieldType.Date;
-            if (def.checks) {
-                for (const check of def.checks) {
-                    const checkDef =
-                        'def' in check ? (check.def as z.core.$ZodCheckDef) : check._zod?.def;
+            if (!def.checks?.length) break;
 
-                    if (checkDef) {
-                        if (checkDef.check === 'greater_than') {
-                            startDate = new Date(
-                                (checkDef as z.core.$ZodCheckGreaterThanDef).value as number
-                            );
-                        }
+            for (const check of def.checks) {
+                const checkDef = check._zod.def;
 
-                        if (checkDef.check === 'less_than') {
-                            endDate = new Date(
-                                (checkDef as z.core.$ZodCheckLessThanDef).value as number
-                            );
-                        }
-                    }
+                if (checkDef.check === 'greater_than') {
+                    startDate = new Date(
+                        (checkDef as z.core.$ZodCheckGreaterThanDef).value as number
+                    );
+                }
+
+                if (checkDef.check === 'less_than') {
+                    endDate = new Date((checkDef as z.core.$ZodCheckLessThanDef).value as number);
                 }
             }
+
             break;
         case 'enum':
             type = AppFieldType.Dropdown;
-            if ((def as z.core.$ZodEnumDef).entries) {
-                options = Object.values((def as z.core.$ZodEnumDef).entries).map(v => v.toString());
-            }
+            options = Object.values((def as z.core.$ZodEnumDef).entries).map(v => v.toString());
 
             break;
         case 'array':
             type = AppFieldType.List;
-            if ((currentSchema as z.ZodArray).element) {
-                child = fieldFromZod('child', (currentSchema as z.ZodArray).element as z.ZodType);
-            }
+            child = fieldFromZod('child', (currentSchema as z.ZodArray).element as z.ZodType);
 
             break;
         case 'object':
             type = AppFieldType.JSON;
-            if ((currentSchema as z.ZodObject).shape) {
-                fields = Object.entries((currentSchema as z.ZodObject).shape).map(([key, val]) =>
-                    fieldFromZod(key, val as z.ZodType)
-                );
-            }
+            fields = Object.entries((currentSchema as z.ZodObject).shape).map(([key, val]) =>
+                fieldFromZod(key, val as z.ZodType)
+            );
 
             break;
         case 'record':
@@ -263,12 +240,11 @@ export function tableFromZod(schema: z.ZodObject, options: AppTableFromZodOption
         fieldFromZod(key, val as z.ZodType)
     );
 
-    const primaryKey = options.primaryKey ?? 'id';
-    const keyField = fields.find(f => f.id === primaryKey);
+    const keyField = fields.find(f => f.id === options.primaryKey);
 
     if (!keyField) {
         throw new Error(
-            `Table ${options.name} must have a primary key field matching '${primaryKey}'.`
+            `Table ${options.name} must have a primary key field matching '${options.primaryKey}'.`
         );
     }
 
