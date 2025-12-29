@@ -91,6 +91,7 @@ describe('Connectors API', () => {
             headers: { Authorization: `Bearer ${token}` },
             payload: { path: [] }
         });
+
         expect(response.statusCode).toBe(404);
     });
 
@@ -136,6 +137,18 @@ describe('Connectors API', () => {
             headers: { Authorization: `Bearer ${token}` },
             payload: { path: [] }
         });
+
+        expect(response.statusCode).toBe(404);
+    });
+
+    it('should 404 for unknown table table', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/connectors/mem/table',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: { path: [] }
+        });
+
         expect(response.statusCode).toBe(404);
     });
 

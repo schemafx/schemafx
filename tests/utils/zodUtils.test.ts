@@ -201,11 +201,6 @@ describe('zodUtils', () => {
             const schema = z.date().min(now).max(tomorrow);
             const field = fieldFromZod('test', schema);
             expect(field.type).toBe(AppFieldType.Date);
-            // Zod stores date checks as number (timestamp) sometimes,
-            // but the implementation seems to extract them if they are 'greater_than'/'less_than'
-            // z.date().min() uses "min" check in newer zod, or specific check.
-            // The implementation checks for 'greater_than' / 'less_than'.
-            // min/max on date usually translate to these checks.
         });
 
         it('should handle array with element', () => {

@@ -23,26 +23,13 @@ describe('inferTable', () => {
         expect(table.connector).toBe('mem');
         expect(table.fields).toHaveLength(7);
 
-        const idField = table.fields.find(f => f.id === 'id');
-        expect(idField?.type).toBe(AppFieldType.Number);
-
-        const nameField = table.fields.find(f => f.id === 'name');
-        expect(nameField?.type).toBe(AppFieldType.Text);
-
-        const activeField = table.fields.find(f => f.id === 'active');
-        expect(activeField?.type).toBe(AppFieldType.Boolean);
-
-        const createdField = table.fields.find(f => f.id === 'created');
-        expect(createdField?.type).toBe(AppFieldType.Date);
-
-        const mixedField = table.fields.find(f => f.id === 'mixed');
-        expect(mixedField?.type).toBe(AppFieldType.Text);
-
-        const undefinedField = table.fields.find(f => f.id === 'undefined');
-        expect(undefinedField?.type).toBe(AppFieldType.Text);
-
-        const nullField = table.fields.find(f => f.id === 'null');
-        expect(nullField?.type).toBe(AppFieldType.Text);
+        expect(table.fields.find(f => f.id === 'id')?.type).toBe(AppFieldType.Number);
+        expect(table.fields.find(f => f.id === 'name')?.type).toBe(AppFieldType.Text);
+        expect(table.fields.find(f => f.id === 'active')?.type).toBe(AppFieldType.Boolean);
+        expect(table.fields.find(f => f.id === 'created')?.type).toBe(AppFieldType.Date);
+        expect(table.fields.find(f => f.id === 'mixed')?.type).toBe(AppFieldType.Text);
+        expect(table.fields.find(f => f.id === 'undefined')?.type).toBe(AppFieldType.Text);
+        expect(table.fields.find(f => f.id === 'null')?.type).toBe(AppFieldType.Text);
     });
 
     it('should infer JSON object', () => {

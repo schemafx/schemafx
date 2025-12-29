@@ -107,7 +107,7 @@ describe('DuckDB Integration Benchmark', () => {
         });
 
         await app.fastifyInstance.ready();
-        token = app.fastifyInstance.jwt.sign({ sub: 'user1' });
+        token = app.fastifyInstance.jwt.sign({ id: 'user1' });
 
         await app.dataService.setSchema({
             id: schemaId,

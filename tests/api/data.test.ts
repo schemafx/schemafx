@@ -87,6 +87,20 @@ describe('Data API', () => {
         expect(body[0].id).toBe(1);
     });
 
+    it('should 404 for unknown application', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app2/data/users',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                actionId: 'add',
+                rows: [{ id: 2, name: 'User 2' }]
+            }
+        });
+
+        expect(response.statusCode).toBe(404);
+    });
+
     it('should filter data', async () => {
         await server.inject({
             method: 'POST',
