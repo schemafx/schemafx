@@ -198,7 +198,7 @@ export default class DataService {
         const existingConnection = await this.getConnection(connection.id);
         this.connectionsCache.set(connection.id, connection);
 
-        this._executeAction({
+        await this._executeAction({
             table: this.connectionsTable,
             auth: this.connectionsConnection,
             actId: existingConnection ? 'update' : 'add',
@@ -245,7 +245,7 @@ export default class DataService {
         const hasSchema = await this.getSchema(schema.id);
         this.schemaCache.set(schema.id, schema);
 
-        this.executeAction({
+        await this.executeAction({
             table: this.schemaTable,
             actId: hasSchema ? 'update' : 'add',
             rows: [schema]
