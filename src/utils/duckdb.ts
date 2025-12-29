@@ -5,13 +5,11 @@ import {
     DuckDBInstance,
     type DuckDBAppender,
     type DuckDBConnection,
-    DuckDBTimestampMillisecondsValue,
     type DuckDBValue,
     type DuckDBType,
     VARCHAR,
     DOUBLE,
     BOOLEAN,
-    TIMESTAMP,
     LIST,
     STRUCT,
     type DuckDBListType,
@@ -19,8 +17,7 @@ import {
     structValue,
     listValue,
     DuckDBStructValue,
-    DuckDBListValue,
-    DuckDBTimestampValue
+    DuckDBListValue
 } from '@duckdb/node-api';
 
 import {
@@ -43,6 +40,7 @@ function mapFieldToDuckDBTypeString(field: AppField): string {
         case AppFieldType.Email:
         case AppFieldType.Dropdown:
         case AppFieldType.Reference:
+        case AppFieldType.Date: // Date uses VARCHAR for nested contexts (struct/list compatibility)
             return 'VARCHAR';
         case AppFieldType.JSON:
             if (field.encrypted) return 'VARCHAR';
@@ -60,8 +58,6 @@ function mapFieldToDuckDBTypeString(field: AppField): string {
             return 'DOUBLE';
         case AppFieldType.Boolean:
             return 'BOOLEAN';
-        case AppFieldType.Date:
-            return 'TIMESTAMP';
         default:
             return 'VARCHAR';
     }
@@ -73,13 +69,12 @@ function getDuckDBType(field: AppField): DuckDBType {
         case AppFieldType.Email:
         case AppFieldType.Dropdown:
         case AppFieldType.Reference:
+        case AppFieldType.Date: // Date uses VARCHAR for nested contexts (struct/list compatibility)
             return VARCHAR;
         case AppFieldType.Number:
             return DOUBLE;
         case AppFieldType.Boolean:
             return BOOLEAN;
-        case AppFieldType.Date:
-            return TIMESTAMP;
         case AppFieldType.List:
             if (field.child) return LIST(getDuckDBType(field.child));
             return VARCHAR;
@@ -114,16 +109,15 @@ function prepareDuckDBValue(field: AppField, value: unknown): DuckDBValue {
         case AppFieldType.Boolean:
             return Boolean(value);
         case AppFieldType.Date:
-            return new DuckDBTimestampMillisecondsValue(
-                BigInt((value instanceof Date ? value : new Date(String(value))).getTime())
-            );
+            // Return ISO string for struct/list compatibility
+            return (value instanceof Date ? value : new Date(String(value))).toISOString();
         case AppFieldType.List:
-            if (Array.isArray(value) && field.child) {
-                const items = value.map(item => prepareDuckDBValue(field.child!, item));
-                return listValue(items);
+            if (field.child) {
+                const items = Array.isArray(value) ? value : [value];
+                return listValue(items.map(item => prepareDuckDBValue(field.child!, item)));
             }
 
-            return String(value);
+            return JSON.stringify(value);
         case AppFieldType.JSON:
             if (
                 typeof value === 'object' &&
@@ -168,41 +162,30 @@ function appendValue(appender: DuckDBAppender, field: AppField, value: unknown) 
             appender.appendBoolean(Boolean(value));
             break;
         case AppFieldType.Date:
-            appender.appendTimestampMilliseconds(
-                new DuckDBTimestampMillisecondsValue(
-                    BigInt((value instanceof Date ? value : new Date(String(value))).getTime())
-                )
+            // Store as ISO string for consistency with nested contexts
+            appender.appendVarchar(
+                (value instanceof Date ? value : new Date(String(value))).toISOString()
             );
-
             break;
         case AppFieldType.List:
             if (field.child) {
-                const preparedList = prepareDuckDBValue(field, value);
-                if (typeof preparedList === 'string') {
-                    appender.appendVarchar(preparedList);
-                } else {
-                    appender.appendList(
-                        preparedList as unknown as DuckDBListValue,
-                        getDuckDBType(field) as DuckDBListType
-                    );
-                }
+                appender.appendList(
+                    prepareDuckDBValue(field, value) as unknown as DuckDBListValue,
+                    getDuckDBType(field) as DuckDBListType
+                );
             } else {
                 appender.appendVarchar(JSON.stringify(value));
             }
 
             break;
         case AppFieldType.JSON:
-            if (field.encrypted) appender.appendVarchar(value as string);
-            else if (field.fields && field.fields.length > 0) {
-                const preparedStruct = prepareDuckDBValue(field, value);
-                if (typeof preparedStruct === 'string') {
-                    appender.appendVarchar(preparedStruct);
-                } else {
-                    appender.appendStruct(
-                        preparedStruct as unknown as DuckDBStructValue,
-                        getDuckDBType(field) as DuckDBStructType
-                    );
-                }
+            if (field.encrypted) {
+                appender.appendVarchar(value as string);
+            } else if (field.fields && field.fields.length > 0) {
+                appender.appendStruct(
+                    prepareDuckDBValue(field, value) as unknown as DuckDBStructValue,
+                    getDuckDBType(field) as DuckDBStructType
+                );
             } else {
                 appender.appendVarchar(JSON.stringify(value));
             }
@@ -254,8 +237,6 @@ function convertDuckDBValue(value: unknown, field: AppField): unknown {
                 if (value instanceof DuckDBStructValue) {
                     const result: Record<string, unknown> = {};
                     for (const subField of field.fields) {
-                        if (!(subField.id in value.entries)) continue;
-
                         result[subField.id] = convertDuckDBValue(
                             value.entries[subField.id],
                             subField
@@ -279,38 +260,30 @@ function convertDuckDBValue(value: unknown, field: AppField): unknown {
             }
 
         case AppFieldType.List:
-            if (field.child) {
-                // Expected List of values
-                if (value instanceof DuckDBListValue) {
-                    return value.items.map(item => convertDuckDBValue(item, field.child!));
-                } else if (Array.isArray(value)) {
-                    return value.map(item => convertDuckDBValue(item, field.child!));
-                }
+            let data;
 
-                return value;
+            if (value instanceof DuckDBListValue) {
+                data = value.items;
             } else if (typeof value === 'string') {
-                // Expected JSON String (List)
                 try {
-                    return JSON.parse(value);
+                    data = JSON.parse(value);
                 } catch {}
             }
 
-            return value;
+            if (!data || !Array.isArray(data)) return [];
+            if (!field.child) return data;
+
+            return data.map(d => convertDuckDBValue(d, field.child!));
 
         case AppFieldType.Date:
-            if (value instanceof DuckDBTimestampValue) {
-                // micros is BigInt
-                return new Date(Number(value.micros) / 1000);
-            } else if (value instanceof DuckDBTimestampMillisecondsValue) {
-                return new Date(Number(value.millis));
-            } else if (typeof value === 'bigint') {
-                // Fallback for number/bigint
-                return new Date(Number(value) / 1000);
+            // Date values are stored as ISO strings (VARCHAR) for struct/list compatibility
+            if (typeof value === 'string') {
+                return new Date(value);
             } else if (typeof value === 'number') {
                 return new Date(value);
             }
 
-            return value;
+            return null;
 
         default:
             // Primitive types
@@ -339,15 +312,6 @@ export function convertDuckDBRowsToAppRows(
 
             // Apply conversion
             val = convertDuckDBValue(val, field);
-
-            // Special handling for JSON fields that were stored as VARCHAR (string)
-            if (field.type === AppFieldType.JSON && (!field.fields || field.fields.length === 0)) {
-                if (typeof val === 'string') {
-                    try {
-                        val = JSON.parse(val);
-                    } catch {}
-                }
-            }
 
             result[field.id] = val;
         }
