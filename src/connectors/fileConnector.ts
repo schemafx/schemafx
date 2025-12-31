@@ -1,9 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import {
     Connector,
+    DataSourceType,
     type AppSchema,
     type AppTableRow,
     type AppTable,
+    type DataSourceDefinition,
     ConnectorTableCapability
 } from '../types.js';
 import { inferTable } from '../utils/dataUtils.js';
@@ -50,6 +52,24 @@ export default class FileConnector extends Connector {
         return {};
     }
 
+    override async getData(table: AppTable): Promise<DataSourceDefinition> {
+        const tableId = table.path[0];
+        if (!tableId) {
+            return {
+                type: DataSourceType.Inline,
+                data: []
+            };
+        }
+
+        const db = await this._readDB();
+        const tableData = db.tables[tableId] || [];
+
+        return {
+            type: DataSourceType.Inline,
+            data: tableData
+        };
+    }
+
     private async _readDB(): Promise<FileDB> {
         try {
             const data = await readFile(this.filePath, 'utf-8');
@@ -68,13 +88,6 @@ export default class FileConnector extends Connector {
 
     private async _writeDB(db: FileDB) {
         await writeFile(this.filePath, JSON.stringify(db, null, 4), 'utf-8');
-    }
-
-    override async getData(table: AppTable) {
-        if (!table.path[0]) return [];
-
-        const db = await this._readDB();
-        return db.tables[table.path[0]] || [];
     }
 
     override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {

@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
-import { type AppTable, AppFieldType, ConnectorTableCapability } from '../../src/types.js';
+import {
+    type AppTable,
+    AppFieldType,
+    ConnectorTableCapability,
+    DataSourceType
+} from '../../src/types.js';
 
 describe('MemoryConnector', () => {
     let connector: MemoryConnector;
@@ -92,27 +97,43 @@ describe('MemoryConnector', () => {
             actions: []
         };
 
-        it('should return empty array when path is empty', async () => {
+        it('should return inline data source with empty array when path is empty', async () => {
             const emptyPathTable = { ...table, path: [] };
-            const data = await connector.getData!(emptyPathTable);
-            expect(data).toEqual([]);
+            const source = await connector.getData!(emptyPathTable);
+
+            expect(source.type).toBe(DataSourceType.Inline);
+            expect(source.type === DataSourceType.Inline && source.data).toEqual([]);
         });
 
-        it('should return empty array when table does not exist', async () => {
-            const data = await connector.getData!(table);
-            expect(data).toEqual([]);
+        it('should return inline data source with empty array when table does not exist', async () => {
+            const source = await connector.getData!(table);
+
+            expect(source.type).toBe(DataSourceType.Inline);
+            expect(source.type === DataSourceType.Inline && source.data).toEqual([]);
         });
 
-        it('should return copy of data when table exists', async () => {
+        it('should return inline data source with data when table exists', async () => {
             connector.tables.set('users', [{ id: 1, name: 'Test' }]);
 
-            const data = await connector.getData!(table);
-            expect(data).toHaveLength(1);
-            expect(data[0]).toEqual({ id: 1, name: 'Test' });
+            const source = await connector.getData!(table);
 
-            // Verify it's a copy, not the original reference
-            data.push({ id: 2, name: 'New' });
-            expect(connector.tables.get('users')).toHaveLength(1);
+            expect(source.type).toBe(DataSourceType.Inline);
+            if (source.type === DataSourceType.Inline) {
+                expect(source.data).toHaveLength(1);
+                expect(source.data[0]).toEqual({ id: 1, name: 'Test' });
+            }
+        });
+
+        it('should return copy of data in inline source', async () => {
+            connector.tables.set('users', [{ id: 1, name: 'Test' }]);
+
+            const source = await connector.getData!(table);
+
+            expect(source.type).toBe(DataSourceType.Inline);
+            if (source.type === DataSourceType.Inline) {
+                source.data.push({ id: 2, name: 'New' });
+                expect(connector.tables.get('users')).toHaveLength(1);
+            }
         });
     });
 
@@ -144,7 +165,7 @@ describe('MemoryConnector', () => {
             const row = { id: 1, name: 'User 1' };
             await connector.addRow!(table, undefined, row);
 
-            const data = await connector.getData!(table);
+            const data = connector.tables.get('users')!;
             expect(data).toHaveLength(1);
             expect(data[0]).toEqual(row);
         });
@@ -154,7 +175,7 @@ describe('MemoryConnector', () => {
 
             await connector.addRow!(table, undefined, { id: 2, name: 'User 2' });
 
-            const data = await connector.getData!(table);
+            const data = connector.tables.get('users')!;
             expect(data).toHaveLength(2);
         });
 
@@ -195,41 +216,48 @@ describe('MemoryConnector', () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, undefined, { id: 1, name: 'Updated' });
 
-            const data = await connector.getData!(table);
-            expect(data[0].name).toBe('User 1');
+            expect(connector.tables.get('users')![0].name).toBe('User 1');
         });
 
         it('should not update when row is undefined', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, { id: 1 }, undefined);
 
-            const data = await connector.getData!(table);
-            expect(data[0].name).toBe('User 1');
+            expect(connector.tables.get('users')![0].name).toBe('User 1');
         });
 
         it('should not update when row not found', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, { id: 999 }, { id: 999, name: 'Updated' });
 
-            const data = await connector.getData!(table);
+            const data = connector.tables.get('users')!;
             expect(data).toHaveLength(1);
             expect(data[0].name).toBe('User 1');
+        });
+
+        it('should not update when table does not exist', async () => {
+            // Table doesn't exist, updateRow should handle gracefully
+            await connector.updateRow!(table, undefined, { id: 1 }, { id: 1, name: 'Updated' });
+            // No error thrown, table still doesn't exist
+            expect(connector.tables.has('users')).toBe(false);
         });
 
         it('should update row', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, { id: 1 }, { id: 1, name: 'Updated' });
 
-            const data = await connector.getData!(table);
-            expect(data[0].name).toBe('Updated');
+            expect(connector.tables.get('users')![0].name).toBe('Updated');
         });
 
         it('should merge row data on update', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1', extra: 'data' });
             await connector.updateRow!(table, undefined, { id: 1 }, { name: 'Updated' });
 
-            const data = await connector.getData!(table);
-            expect(data[0]).toEqual({ id: 1, name: 'Updated', extra: 'data' });
+            expect(connector.tables.get('users')![0]).toEqual({
+                id: 1,
+                name: 'Updated',
+                extra: 'data'
+            });
         });
     });
 
@@ -257,23 +285,27 @@ describe('MemoryConnector', () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.deleteRow!(table, undefined, undefined);
 
-            const data = await connector.getData!(table);
-            expect(data).toHaveLength(1);
+            expect(connector.tables.get('users')).toHaveLength(1);
         });
 
         it('should not delete when row not found', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.deleteRow!(table, undefined, { id: 999 });
 
-            const data = await connector.getData!(table);
-            expect(data).toHaveLength(1);
+            expect(connector.tables.get('users')).toHaveLength(1);
+        });
+
+        it('should not delete when table does not exist', async () => {
+            // Table doesn't exist, deleteRow should handle gracefully
+            await connector.deleteRow!(table, undefined, { id: 1 });
+            // No error thrown, table still doesn't exist
+            expect(connector.tables.has('users')).toBe(false);
         });
 
         it('should delete row', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.deleteRow!(table, undefined, { id: 1 });
-            const data = await connector.getData!(table);
-            expect(data).toHaveLength(0);
+            expect(connector.tables.get('users')).toHaveLength(0);
         });
 
         it('should delete correct row when multiple exist', async () => {
@@ -281,7 +313,7 @@ describe('MemoryConnector', () => {
             await connector.addRow!(table, undefined, { id: 2, name: 'User 2' });
             await connector.deleteRow!(table, undefined, { id: 1 });
 
-            const data = await connector.getData!(table);
+            const data = connector.tables.get('users')!;
             expect(data).toHaveLength(1);
             expect(data[0].id).toBe(2);
         });

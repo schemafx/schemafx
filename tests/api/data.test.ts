@@ -8,7 +8,9 @@ import {
     AppTable,
     AppFieldType,
     AppActionType,
-    QueryFilterOperator
+    QueryFilterOperator,
+    DataSourceType,
+    type DataSourceDefinition
 } from '../../src/types.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -51,8 +53,11 @@ class LimitedConnector extends Connector {
         return {};
     }
 
-    async getData() {
-        return [...this.data];
+    async getData(): Promise<DataSourceDefinition> {
+        return {
+            type: DataSourceType.Inline,
+            data: [...this.data]
+        };
     }
 }
 

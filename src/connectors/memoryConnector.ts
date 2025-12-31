@@ -1,8 +1,10 @@
 import {
     Connector,
+    DataSourceType,
     type AppSchema,
     type AppTableRow,
     type AppTable,
+    type DataSourceDefinition,
     ConnectorTableCapability
 } from '../types.js';
 import { inferTable } from '../utils/dataUtils.js';
@@ -37,16 +39,22 @@ export default class MemoryConnector extends Connector {
         return {};
     }
 
-    override async getData(table: AppTable) {
-        if (!table.path[0]) return [];
-        return [...(this.tables.get(table.path[0]) ?? [])];
+    override async getData(table: AppTable): Promise<DataSourceDefinition> {
+        if (!table.path[0]) {
+            return { type: DataSourceType.Inline, data: [] };
+        }
+
+        return {
+            type: DataSourceType.Inline,
+            data: [...(this.tables.get(table.path[0]) ?? [])]
+        };
     }
 
     override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         if (!table.path[0]) return;
         if (!row) return;
 
-        const data = await this.getData(table);
+        const data = this.tables.get(table.path[0]) ?? [];
         data.push(row);
         this.tables.set(table.path[0], data);
     }
@@ -59,7 +67,7 @@ export default class MemoryConnector extends Connector {
     ) {
         if (!table.path[0] || !key || !row) return;
 
-        const data = await this.getData(table);
+        const data = this.tables.get(table.path[0]) ?? [];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex === -1) return;
@@ -71,7 +79,7 @@ export default class MemoryConnector extends Connector {
     override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
         if (!table.path[0] || !key) return;
 
-        const data = await this.getData(table);
+        const data = this.tables.get(table.path[0]) ?? [];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex === -1) return;

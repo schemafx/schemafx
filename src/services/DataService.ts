@@ -13,20 +13,10 @@ import {
 } from '../types.js';
 import type { z } from 'zod';
 import { type AppTableFromZodOptions, tableFromZod, zodFromTable } from '../utils/zodUtils.js';
-import {
-    buildSQLQuery,
-    convertDuckDBRowsToAppRows,
-    createDuckDBInstance,
-    ingestDataToDuckDB,
-    ingestStreamToDuckDB
-} from '../utils/duckdb.js';
-import type { DuckDBValue } from '@duckdb/node-api';
-import knex from 'knex';
+import { getData as getDuckDBData } from '../utils/duckdb.js';
 import { extractKeys } from '../utils/schemaUtils.js';
 import { decodeRow, encodeRow } from '../utils/dataUtils.js';
 import { randomUUID } from 'crypto';
-
-const qb = knex({ client: 'pg' });
 
 type executeActionOptions = {
     table: AppTable;
@@ -273,10 +263,7 @@ export default class DataService {
         }
     ) {
         const { table, auth, actId, rows, depth } = opts;
-
-        if ((depth ?? 0) > this.maxRecursiveDepth) {
-            throw new Error('Max recursion depth exceeded.');
-        }
+        if ((depth ?? 0) > this.maxRecursiveDepth) throw new Error('Max recursion depth exceeded.');
 
         const action = table.actions?.find(a => a.id === actId);
         if (!action) throw new Error(`Action ${actId} not found.`);
@@ -355,48 +342,19 @@ export default class DataService {
 
     private async _getData(table: AppTable, auth?: string, query?: TableQueryOptions) {
         const connector = this.connectors[table.connector];
-        if (!connector?.getData && !connector?.getDataStream) return [];
+        if (!connector?.getData) return [];
 
-        const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
-        const dbInstance = await createDuckDBInstance();
-        const connection = await dbInstance.connect();
+        const encryptionKey = this.encryptionKey;
+        const decodeRowFn = encryptionKey
+            ? (row: Record<string, unknown>) => decodeRow(row, table, encryptionKey)
+            : undefined;
 
-        if (connector.getDataStream) {
-            await ingestStreamToDuckDB(
-                connection,
-                await connector.getDataStream(table, auth),
-                table,
-                tempTableName
-            );
-        } else {
-            await ingestDataToDuckDB(
-                connection,
-                await connector.getData!(table, auth),
-                table,
-                tempTableName
-            );
-        }
-
-        const { sql, params } = buildSQLQuery(tempTableName, query || {});
-        const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
-        const rows = await reader.getRows();
-
-        const result = convertDuckDBRowsToAppRows(
-            rows.map(row => {
-                const obj: Record<string, unknown> = {};
-                table.fields.forEach((field, index) => {
-                    obj[field.id] = row[index];
-                });
-
-                return decodeRow(obj, table, this.encryptionKey);
-            }),
-            table
-        );
-
-        await connection.run(qb.schema.dropTableIfExists(tempTableName).toString());
-        connection.closeSync();
-
-        return result;
+        const source = await connector.getData(table, auth);
+        return getDuckDBData({
+            source,
+            query,
+            decodeRow: decodeRowFn
+        });
     }
 
     async getData(table: AppTable, query?: TableQueryOptions) {

@@ -1,323 +1,56 @@
-import { Readable } from 'node:stream';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { pipeline } from 'stream/promises';
+
 import knex from 'knex';
 
 import {
     DuckDBInstance,
-    type DuckDBAppender,
-    type DuckDBConnection,
-    type DuckDBValue,
-    type DuckDBType,
-    VARCHAR,
-    DOUBLE,
-    BOOLEAN,
-    LIST,
-    STRUCT,
-    type DuckDBListType,
-    type DuckDBStructType,
-    structValue,
-    listValue,
     DuckDBStructValue,
-    DuckDBListValue
+    DuckDBListValue,
+    type DuckDBValue
 } from '@duckdb/node-api';
 
 import {
-    AppFieldType,
-    type AppTable,
-    type AppField,
     QueryFilterOperator,
-    type TableQueryOptions
+    DataSourceType,
+    DataSourceFormat,
+    type TableQueryOptions,
+    type DataSourceDefinition
 } from '../types.js';
+
+export { QueryFilterOperator };
 
 const qb = knex({ client: 'pg' });
 
-export async function createDuckDBInstance() {
-    return DuckDBInstance.create(':memory:');
-}
+/**
+ * Recursively convert DuckDB types to plain JavaScript values.
+ */
+function toPlainValue(value: unknown): unknown {
+    if (value === null || value === undefined) return value;
 
-function mapFieldToDuckDBTypeString(field: AppField): string {
-    switch (field.type) {
-        case AppFieldType.Text:
-        case AppFieldType.Email:
-        case AppFieldType.Dropdown:
-        case AppFieldType.Reference:
-        case AppFieldType.Date: // Date uses VARCHAR for nested contexts (struct/list compatibility)
-            return 'VARCHAR';
-        case AppFieldType.JSON:
-            if (field.encrypted) return 'VARCHAR';
-            if (field.fields && field.fields.length > 0) {
-                return `STRUCT(${field.fields
-                    .map(f => `${qb.ref(f.id).toString()} ${mapFieldToDuckDBTypeString(f)}`)
-                    .join(', ')})`;
-            }
-
-            return 'VARCHAR';
-        case AppFieldType.List:
-            if (field.child) return `${mapFieldToDuckDBTypeString(field.child)}[]`;
-            return 'VARCHAR';
-        case AppFieldType.Number:
-            return 'DOUBLE';
-        case AppFieldType.Boolean:
-            return 'BOOLEAN';
-        default:
-            return 'VARCHAR';
-    }
-}
-
-function getDuckDBType(field: AppField): DuckDBType {
-    switch (field.type) {
-        case AppFieldType.Text:
-        case AppFieldType.Email:
-        case AppFieldType.Dropdown:
-        case AppFieldType.Reference:
-        case AppFieldType.Date: // Date uses VARCHAR for nested contexts (struct/list compatibility)
-            return VARCHAR;
-        case AppFieldType.Number:
-            return DOUBLE;
-        case AppFieldType.Boolean:
-            return BOOLEAN;
-        case AppFieldType.List:
-            if (field.child) return LIST(getDuckDBType(field.child));
-            return VARCHAR;
-        case AppFieldType.JSON:
-            if (field.encrypted) return VARCHAR;
-            if (field.fields && field.fields.length > 0) {
-                const entries: Record<string, DuckDBType> = {};
-                for (const f of field.fields) entries[f.id] = getDuckDBType(f);
-
-                return STRUCT(entries);
-            }
-
-            return VARCHAR;
-        default:
-            return VARCHAR;
-    }
-}
-
-function prepareDuckDBValue(field: AppField, value: unknown): DuckDBValue {
-    if (value === null || value === undefined) {
-        return null;
-    }
-
-    switch (field.type) {
-        case AppFieldType.Text:
-        case AppFieldType.Email:
-        case AppFieldType.Dropdown:
-        case AppFieldType.Reference:
-            return String(value);
-        case AppFieldType.Number:
-            return Number(value);
-        case AppFieldType.Boolean:
-            return Boolean(value);
-        case AppFieldType.Date:
-            // Return ISO string for struct/list compatibility
-            return (value instanceof Date ? value : new Date(String(value))).toISOString();
-        case AppFieldType.List:
-            if (field.child) {
-                const items = Array.isArray(value) ? value : [value];
-                return listValue(items.map(item => prepareDuckDBValue(field.child!, item)));
-            }
-
-            return JSON.stringify(value);
-        case AppFieldType.JSON:
-            if (
-                typeof value === 'object' &&
-                value !== null &&
-                field.fields &&
-                field.fields.length > 0
-            ) {
-                const structEntries: Record<string, DuckDBValue> = {};
-                for (const subField of field.fields) {
-                    structEntries[subField.id] = prepareDuckDBValue(
-                        subField,
-                        (value as Record<string, unknown>)[subField.id]
-                    );
-                }
-
-                return structValue(structEntries);
-            }
-
-            return JSON.stringify(value);
-        default:
-            return String(value);
-    }
-}
-
-function appendValue(appender: DuckDBAppender, field: AppField, value: unknown) {
-    if (value === null || value === undefined) {
-        appender.appendNull();
-        return;
-    }
-
-    switch (field.type) {
-        case AppFieldType.Text:
-        case AppFieldType.Email:
-        case AppFieldType.Dropdown:
-        case AppFieldType.Reference:
-            appender.appendVarchar(String(value));
-            break;
-        case AppFieldType.Number:
-            appender.appendDouble(Number(value));
-            break;
-        case AppFieldType.Boolean:
-            appender.appendBoolean(Boolean(value));
-            break;
-        case AppFieldType.Date:
-            // Store as ISO string for consistency with nested contexts
-            appender.appendVarchar(
-                (value instanceof Date ? value : new Date(String(value))).toISOString()
-            );
-            break;
-        case AppFieldType.List:
-            if (field.child) {
-                appender.appendList(
-                    prepareDuckDBValue(field, value) as unknown as DuckDBListValue,
-                    getDuckDBType(field) as DuckDBListType
-                );
-            } else {
-                appender.appendVarchar(JSON.stringify(value));
-            }
-
-            break;
-        case AppFieldType.JSON:
-            if (field.encrypted) {
-                appender.appendVarchar(value as string);
-            } else if (field.fields && field.fields.length > 0) {
-                appender.appendStruct(
-                    prepareDuckDBValue(field, value) as unknown as DuckDBStructValue,
-                    getDuckDBType(field) as DuckDBStructType
-                );
-            } else {
-                appender.appendVarchar(JSON.stringify(value));
-            }
-
-            break;
-        default:
-            appender.appendVarchar(String(value));
-    }
-}
-
-export async function ingestStreamToDuckDB(
-    connection: DuckDBConnection,
-    stream: Readable,
-    table: AppTable,
-    tableName: string
-) {
-    await connection.run(
-        `CREATE OR REPLACE TABLE ${qb.ref(tableName).toString()} (${table.fields
-            .map(f => `${qb.ref(f.id).toString()} ${mapFieldToDuckDBTypeString(f)}`)
-            .join(', ')})`
-    );
-
-    const appender = await connection.createAppender(tableName);
-
-    for await (const row of stream) {
-        for (const field of table.fields) appendValue(appender, field, row[field.id]);
-        appender.endRow();
-    }
-
-    appender.closeSync();
-}
-
-export async function ingestDataToDuckDB(
-    connection: DuckDBConnection,
-    data: Record<string, unknown>[],
-    table: AppTable,
-    tableName: string
-) {
-    return ingestStreamToDuckDB(connection, Readable.from(data), table, tableName);
-}
-
-function convertDuckDBValue(value: unknown, field: AppField): unknown {
-    if (value === null || value === undefined) return undefined;
-
-    switch (field.type) {
-        case AppFieldType.JSON:
-            if (field.fields && field.fields.length > 0) {
-                // Expected Struct
-                if (value instanceof DuckDBStructValue) {
-                    const result: Record<string, unknown> = {};
-                    for (const subField of field.fields) {
-                        result[subField.id] = convertDuckDBValue(
-                            value.entries[subField.id],
-                            subField
-                        );
-                    }
-
-                    return result;
-                }
-
-                // If we get here, it might be null or something unexpected
-                return value;
-            } else {
-                // Expected JSON String
-                if (typeof value === 'string') {
-                    try {
-                        return JSON.parse(value);
-                    } catch {}
-                }
-
-                return value;
-            }
-
-        case AppFieldType.List:
-            let data;
-
-            if (value instanceof DuckDBListValue) {
-                data = value.items;
-            } else if (typeof value === 'string') {
-                try {
-                    data = JSON.parse(value);
-                } catch {}
-            }
-
-            if (!data || !Array.isArray(data)) return [];
-            if (!field.child) return data;
-
-            return data.map(d => convertDuckDBValue(d, field.child!));
-
-        case AppFieldType.Date:
-            // Date values are stored as ISO strings (VARCHAR) for struct/list compatibility
-            if (typeof value === 'string') {
-                return new Date(value);
-            } else if (typeof value === 'number') {
-                return new Date(value);
-            }
-
-            return null;
-
-        default:
-            // Primitive types
-            if (typeof value === 'bigint') {
-                if (value <= Number.MAX_SAFE_INTEGER && value >= Number.MIN_SAFE_INTEGER) {
-                    return Number(value);
-                }
-
-                return String(value);
-            }
-
-            return value;
-    }
-}
-
-export function convertDuckDBRowsToAppRows(
-    rows: Record<string, unknown>[],
-    table: AppTable
-): Record<string, unknown>[] {
-    return rows.map(row => {
+    if (value instanceof DuckDBStructValue) {
         const result: Record<string, unknown> = {};
-
-        for (const field of table.fields) {
-            if (!(field.id in row)) continue;
-            let val = row[field.id];
-
-            // Apply conversion
-            val = convertDuckDBValue(val, field);
-
-            result[field.id] = val;
-        }
+        for (const [key, val] of Object.entries(value.entries)) result[key] = toPlainValue(val);
 
         return result;
-    });
+    }
+
+    if (value instanceof DuckDBListValue) return value.items.map(toPlainValue);
+
+    // DuckDB returns bigint for integer types - convert to number
+    if (typeof value === 'bigint') return Number(value);
+
+    // Handle plain objects (e.g., from getRowObjects)
+    if (typeof value === 'object' && value !== null) {
+        const result: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(value)) result[key] = toPlainValue(val);
+
+        return result;
+    }
+
+    return value;
 }
 
 export function buildSQLQuery(tableName: string, options: TableQueryOptions) {
@@ -351,9 +84,176 @@ export function buildSQLQuery(tableName: string, options: TableQueryOptions) {
         }
     }
 
+    if (options.orderBy) {
+        query = query.orderBy(options.orderBy.column, options.orderBy.direction);
+    }
+
     if (typeof options.limit === 'number') query = query.limit(options.limit);
     if (typeof options.offset === 'number') query = query.offset(options.offset);
 
     const { sql, bindings } = query.toSQL();
     return { sql, params: bindings };
+}
+
+/**
+ * Options for querying data from a DataSourceDefinition.
+ */
+export type GetDataOptions = {
+    /** Data source definition describing how to access the data */
+    source: DataSourceDefinition;
+    /** Query options (filters, limit, offset) */
+    query?: TableQueryOptions;
+    /** Optional row decoder for encrypted data */
+    decodeRow?: (row: Record<string, unknown>) => Record<string, unknown>;
+};
+
+/**
+ * Map DataSourceFormat to DuckDB read function.
+ */
+function getReadFunction(format?: DataSourceFormat): string {
+    switch (format) {
+        case DataSourceFormat.Json:
+            return 'read_json_auto';
+        case DataSourceFormat.Csv:
+            return 'read_csv_auto';
+        case DataSourceFormat.Parquet:
+            return 'read_parquet';
+        case DataSourceFormat.Ndjson:
+            return 'read_ndjson_auto';
+        case DataSourceFormat.Auto:
+        default:
+            return 'read_json_auto';
+    }
+}
+
+/**
+ * Query data from a DataSourceDefinition using DuckDB.
+ * Handles different source types (inline, file, url, etc.) and
+ * performs efficient querying without unnecessary data copying.
+ */
+export async function getData({
+    source,
+    query,
+    decodeRow
+}: GetDataOptions): Promise<Record<string, unknown>[]> {
+    const tempTableName = `t_${Math.random().toString(36).substring(7)}`;
+    const quotedName = qb.ref(tempTableName).toString();
+    const dbInstance = await DuckDBInstance.create(':memory:');
+    const connection = await dbInstance.connect();
+
+    let tempFilePath: string | undefined;
+
+    try {
+        // Create table based on source type
+        switch (source.type) {
+            case DataSourceType.Inline: {
+                // For inline data, we need to write to a temp file
+                if (source.data.length === 0) return [];
+
+                tempFilePath = path.join(
+                    os.tmpdir(),
+                    `duckdb_${Date.now()}_${Math.random().toString(36).substring(7)}.json`
+                );
+
+                fs.writeFileSync(tempFilePath, JSON.stringify(source.data));
+
+                await connection.run(
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM read_json_auto('${tempFilePath}')`
+                );
+
+                break;
+            }
+
+            case DataSourceType.File: {
+                // For file sources, DuckDB can read directly from the file
+                await connection.run(
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}('${source.path.replace(/\\/g, '/')}')`
+                );
+
+                break;
+            }
+
+            case DataSourceType.Url: {
+                // Create HTTP secret with headers if provided
+                const headers = source.options?.headers;
+                if (headers && Object.keys(headers).length > 0) {
+                    await connection.run(`
+                        CREATE SECRET http_auth (
+                            TYPE HTTP,
+                            EXTRA_HTTP_HEADERS MAP {${Object.entries(headers)
+                                .map(([k, v]) => `'${k}': '${v}'`)
+                                .join(', ')}}
+                        );
+                    `);
+                }
+
+                // DuckDB can fetch directly from HTTP/HTTPS URLs
+                await connection.run(
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}('${source.url}')`
+                );
+
+                break;
+            }
+
+            case DataSourceType.Stream: {
+                // For streams, pipe directly to a temp file using streams
+                tempFilePath = path.join(
+                    os.tmpdir(),
+                    `duckdb_${Date.now()}_${Math.random().toString(36).substring(7)}.json`
+                );
+
+                // Use pipeline to efficiently stream data to file
+                await pipeline(source.stream, fs.createWriteStream(tempFilePath));
+
+                await connection.run(
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}('${tempFilePath}')`
+                );
+
+                break;
+            }
+
+            case DataSourceType.Connection: {
+                // Install and load the specified DuckDB extension dynamically
+                const { module, connectionString, target } = source;
+                const connStr = connectionString.replace(/\\/g, '/');
+                const attachName = `db_${Math.random().toString(36).substring(7)}`;
+                const moduleUpper = module.toUpperCase();
+
+                await connection.run(`INSTALL ${module}; LOAD ${module};`);
+                await connection.run(
+                    `ATTACH '${connStr}' AS ${attachName} (TYPE ${moduleUpper}, READ_ONLY)`
+                );
+
+                await connection.run(
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${attachName}.${target}`
+                );
+
+                break;
+            }
+        }
+
+        // Build and execute query
+        const { sql, params } = buildSQLQuery(tempTableName, query || {});
+        const reader = await connection.run(sql, params as unknown[] as DuckDBValue[]);
+
+        // Get rows as objects and convert DuckDB types to plain JS values
+        const rows = await reader.getRowObjects();
+
+        // Convert DuckDB types (bigint, DuckDBListValue, etc.) to plain JS,
+        // and apply optional decryption
+        return rows.map(row => {
+            const plain = toPlainValue(row) as Record<string, unknown>;
+            return decodeRow ? decodeRow(plain) : plain;
+        });
+    } finally {
+        // Cleanup
+        connection.closeSync();
+        if (tempFilePath) {
+            try {
+                fs.unlinkSync(tempFilePath);
+            } catch {
+                // Ignore cleanup errors
+            }
+        }
+    }
 }

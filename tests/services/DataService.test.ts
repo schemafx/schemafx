@@ -132,10 +132,8 @@ describe('DataService', () => {
             await dataService.deleteConnection('delete-test');
             expect(dataService.connectionsCache.has('delete-test')).toBe(false);
 
-            // In MemoryConnector, deleteRow might not be synchronous or reflected immediately if we don't wait or if there's some issue.
-            // However, it is synchronous in MemoryConnector.
-            // Let's verify with the connector directly first
-            const connectorData = await connector.getData(dataService.connectionsTable);
+            // Verify connection was deleted from the connector
+            const connectorData = connector.tables.get(dataService.connectionsTable.path[0]) ?? [];
             expect(connectorData.find(c => c.id === 'delete-test')).toBeUndefined();
 
             const fetched = await dataService.getConnection('delete-test');
@@ -373,7 +371,7 @@ describe('DataService', () => {
             expect(data).toHaveLength(1);
         });
 
-        it('should return empty array when connector has no getData or getDataStream', async () => {
+        it('should return empty array when connector has no getData', async () => {
             const minimalConnector = new (class MinimalConnector extends Connector {
                 async listTables() {
                     return [];

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { inferTable } from '../../src/utils/dataUtils.js';
+import { inferTable, decodeRow } from '../../src/utils/dataUtils.js';
 import { AppFieldType } from '../../src/types.js';
 
 describe('inferTable', () => {
@@ -89,5 +89,23 @@ describe('inferTable', () => {
         const table = inferTable('Table', [], data, 'mem');
 
         expect(table.fields.find(f => f.id === 'tags')?.type).toBe(AppFieldType.List);
+    });
+});
+
+describe('decodeRow', () => {
+    it('should return row unchanged when no encryption key is provided', () => {
+        const table = {
+            id: 'test',
+            name: 'Test',
+            connector: 'mem',
+            path: [],
+            fields: [{ id: 'name', name: 'Name', type: AppFieldType.Text, encrypted: true }],
+            actions: []
+        };
+        const row = { name: 'secret value' };
+
+        const result = decodeRow(row, table);
+
+        expect(result).toEqual(row);
     });
 });

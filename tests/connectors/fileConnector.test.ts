@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import FileConnector from '../../src/connectors/fileConnector.js';
-import { type AppTable, AppFieldType, ConnectorTableCapability } from '../../src/types.js';
+import {
+    type AppTable,
+    AppFieldType,
+    ConnectorTableCapability,
+    DataSourceType
+} from '../../src/types.js';
 import { unlink, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 
@@ -125,32 +130,51 @@ describe('FileConnector', () => {
             actions: []
         };
 
-        it('should return empty array when path is empty', async () => {
-            const emptyPathTable = { ...table, path: [] };
-            const data = await connector.getData!(emptyPathTable);
-            expect(data).toEqual([]);
+        it('should return inline data source with table data', async () => {
+            const source = await connector.getData!(table);
+
+            expect(source.type).toBe(DataSourceType.Inline);
+            if (source.type === DataSourceType.Inline) {
+                expect(Array.isArray(source.data)).toBe(true);
+            }
         });
 
-        it('should return empty array when table does not exist', async () => {
-            const data = await connector.getData!(table);
-            expect(data).toEqual([]);
+        it('should return empty array for non-existent table', async () => {
+            const nonExistentTable: AppTable = {
+                ...table,
+                path: ['non_existent']
+            };
+            const source = await connector.getData!(nonExistentTable);
+
+            expect(source.type).toBe(DataSourceType.Inline);
+            if (source.type === DataSourceType.Inline) {
+                expect(source.data).toEqual([]);
+            }
         });
 
-        it('should return data when table exists', async () => {
-            await writeFile(
-                TEST_DB_PATH,
-                JSON.stringify({
-                    schemas: {},
-                    tables: {
-                        users: [{ id: 1, name: 'Test' }]
-                    }
-                }),
-                'utf-8'
-            );
+        it('should return correct data for specific table', async () => {
+            // First add some data
+            await connector.addRow!(table, undefined, { id: 1, name: 'Test' });
+            const source = await connector.getData!(table);
 
-            const data = await connector.getData!(table);
-            expect(data).toHaveLength(1);
-            expect(data[0]).toEqual({ id: 1, name: 'Test' });
+            expect(source.type).toBe(DataSourceType.Inline);
+            if (source.type === DataSourceType.Inline) {
+                expect(source.data).toHaveLength(1);
+                expect(source.data[0]).toEqual({ id: 1, name: 'Test' });
+            }
+        });
+
+        it('should return empty array when table path is empty', async () => {
+            const emptyPathTable: AppTable = {
+                ...table,
+                path: []
+            };
+            const source = await connector.getData!(emptyPathTable);
+
+            expect(source.type).toBe(DataSourceType.Inline);
+            if (source.type === DataSourceType.Inline) {
+                expect(source.data).toEqual([]);
+            }
         });
     });
 
