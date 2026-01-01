@@ -8,7 +8,9 @@ import {
     AppTable,
     AppFieldType,
     AppActionType,
-    QueryFilterOperator
+    QueryFilterOperator,
+    DataSourceType,
+    type DataSourceDefinition
 } from '../../src/types.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -51,8 +53,11 @@ class LimitedConnector extends Connector {
         return {};
     }
 
-    async getData() {
-        return [...this.data];
+    async getData(): Promise<DataSourceDefinition> {
+        return {
+            type: DataSourceType.Inline,
+            data: [...this.data]
+        };
     }
 }
 
@@ -85,6 +90,20 @@ describe('Data API', () => {
         const body = JSON.parse(response.payload);
         expect(body).toHaveLength(1);
         expect(body[0].id).toBe(1);
+    });
+
+    it('should 404 for unknown application', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app2/data/users',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                actionId: 'add',
+                rows: [{ id: 2, name: 'User 2' }]
+            }
+        });
+
+        expect(response.statusCode).toBe(404);
     });
 
     it('should filter data', async () => {

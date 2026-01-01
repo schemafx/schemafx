@@ -1,9 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import {
     Connector,
+    DataSourceType,
     type AppSchema,
     type AppTableRow,
     type AppTable,
+    type DataSourceDefinition,
     ConnectorTableCapability
 } from '../types.js';
 import { inferTable } from '../utils/dataUtils.js';
@@ -23,6 +25,7 @@ export default class FileConnector extends Connector {
 
     async listTables(path: string[]) {
         if (path.length > 0) return [];
+
         const db = await this._readDB();
         const tables = new Set<string>();
 
@@ -36,16 +39,35 @@ export default class FileConnector extends Connector {
     }
 
     async getTable(path: string[]) {
-        const db = await this._readDB();
         const tableId = path[0];
+        if (!tableId) return;
 
+        const db = await this._readDB();
         return inferTable(tableId, path, db.tables[tableId] || [], this.id);
     }
 
-    async getCapabilities() {
+    override async getCapabilities() {
         // In-Memory capabilities only.
         // Default capability handler.
         return {};
+    }
+
+    override async getData(table: AppTable): Promise<DataSourceDefinition> {
+        const tableId = table.path[0];
+        if (!tableId) {
+            return {
+                type: DataSourceType.Inline,
+                data: []
+            };
+        }
+
+        const db = await this._readDB();
+        const tableData = db.tables[tableId] || [];
+
+        return {
+            type: DataSourceType.Inline,
+            data: tableData
+        };
     }
 
     private async _readDB(): Promise<FileDB> {
@@ -68,51 +90,48 @@ export default class FileConnector extends Connector {
         await writeFile(this.filePath, JSON.stringify(db, null, 4), 'utf-8');
     }
 
-    async getData(table: AppTable) {
-        const db = await this._readDB();
-        return db.tables[table.path[0]] || [];
-    }
+    override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
+        if (!table.path[0] || !row) return;
 
-    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
         const db = await this._readDB();
-        if (!row) return;
-
         if (!db.tables[table.path[0]]) db.tables[table.path[0]] = [];
 
-        db.tables[table.path[0]].push(row);
+        db.tables[table.path[0]]!.push(row);
         await this._writeDB(db);
     }
 
-    async updateRow(
+    override async updateRow(
         table: AppTable,
         auth?: string,
         key?: Record<string, unknown>,
         row?: AppTableRow
     ) {
-        const db = await this._readDB();
-        if (!key || !row) return;
-        if (!db.tables[table.path[0]]) return;
+        if (!table.path[0] || !key || !row) return;
 
+        const db = await this._readDB();
         const data = db.tables[table.path[0]];
+        if (!data) return;
+
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
-        if (rowIndex !== -1) {
-            data[rowIndex] = { ...data[rowIndex], ...row };
-            await this._writeDB(db);
-        }
+        if (rowIndex === -1) return;
+
+        data[rowIndex] = { ...data[rowIndex], ...row };
+        await this._writeDB(db);
     }
 
-    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
-        const db = await this._readDB();
-        if (!key) return;
-        if (!db.tables[table.path[0]]) return;
+    override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+        if (!table.path[0] || !key) return;
 
+        const db = await this._readDB();
         const data = db.tables[table.path[0]];
+        if (!data) return;
+
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
-        if (rowIndex !== -1) {
-            data.splice(rowIndex, 1);
-            await this._writeDB(db);
-        }
+        if (rowIndex === -1) return;
+
+        data.splice(rowIndex, 1);
+        await this._writeDB(db);
     }
 }

@@ -6,9 +6,10 @@ import {
     type AppTable,
     Connector,
     ConnectorTableCapability,
-    QueryFilterOperator
+    QueryFilterOperator,
+    DataSourceType,
+    type DataSourceDefinition
 } from '../src/types.js';
-import { Readable } from 'node:stream';
 
 class BenchmarkConnector extends Connector {
     rowCount: number;
@@ -43,31 +44,6 @@ class BenchmarkConnector extends Connector {
         };
     }
 
-    async getDataStream() {
-        let current = 0;
-        const max = this.rowCount;
-
-        return new Readable({
-            objectMode: true,
-            read() {
-                if (current >= max) {
-                    this.push(null);
-                    return;
-                }
-
-                for (let i = 0; i < 100 && current < max; i++) {
-                    this.push({
-                        id: current,
-                        name: `User ${current}`,
-                        active: current % 2 === 0
-                    });
-
-                    current++;
-                }
-            }
-        });
-    }
-
     async getData() {
         const rows = [];
         for (let i = 0; i < this.rowCount; i++) {
@@ -78,7 +54,10 @@ class BenchmarkConnector extends Connector {
             });
         }
 
-        return rows;
+        return {
+            type: DataSourceType.Inline,
+            data: rows
+        };
     }
 }
 
@@ -107,7 +86,7 @@ describe('DuckDB Integration Benchmark', () => {
         });
 
         await app.fastifyInstance.ready();
-        token = app.fastifyInstance.jwt.sign({ sub: 'user1' });
+        token = app.fastifyInstance.jwt.sign({ id: 'user1' });
 
         await app.dataService.setSchema({
             id: schemaId,

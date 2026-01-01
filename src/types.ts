@@ -1,5 +1,132 @@
 import { z } from 'zod';
-import type { Readable } from 'node:stream';
+
+// ============================================================================
+// Data Source Definitions
+// ============================================================================
+
+/**
+ * Types of data sources that connectors can provide.
+ */
+export enum DataSourceType {
+    /** In-memory data (JavaScript objects/arrays) */
+    Inline = 'inline',
+    /** Local file path (JSON, CSV, Parquet, Excel, etc.) */
+    File = 'file',
+    /** Remote URL (HTTP/HTTPS endpoints, Google Sheets, cloud storage) */
+    Url = 'url',
+    /** Readable stream for streaming data sources */
+    Stream = 'stream',
+    /** Database connection with query (SQL, MongoDB, etc.) */
+    Connection = 'connection'
+}
+
+/**
+ * File format hints for file-based and URL-based sources.
+ * Extensible for future format support.
+ */
+export enum DataSourceFormat {
+    Json = 'json',
+    Csv = 'csv',
+    Parquet = 'parquet',
+    Ndjson = 'ndjson',
+    Xml = 'xml',
+    Auto = 'auto'
+}
+
+/**
+ * Common options shared across data source definitions.
+ */
+export type DataSourceOptions = {
+    /** Optional format hint for the data source */
+    format?: DataSourceFormat;
+    /** Optional encoding (e.g., 'utf-8', 'base64') */
+    encoding?: string;
+    /** Optional compression type (e.g., 'gzip', 'zstd') */
+    compression?: string;
+    /** Optional headers for HTTP requests */
+    headers?: Record<string, string>;
+    /** Optional authentication token or credentials */
+    auth?: string;
+    /** Custom options for specific implementations */
+    custom?: Record<string, unknown>;
+};
+
+/**
+ * Inline data source - data is provided directly as JavaScript objects.
+ * Used by MemoryConnector and similar in-memory stores.
+ */
+export type InlineDataSource = {
+    type: DataSourceType.Inline;
+    /** The actual data as an array of records */
+    data: Record<string, unknown>[];
+    options?: DataSourceOptions;
+};
+
+/**
+ * File data source - data is stored in a local file.
+ * DuckDB and similar engines can read directly from file paths.
+ */
+export type FileDataSource = {
+    type: DataSourceType.File;
+    /** Absolute or relative file path */
+    path: string;
+    options?: DataSourceOptions;
+};
+
+/**
+ * URL data source - data is accessible via HTTP/HTTPS.
+ * Supports REST APIs, cloud storage, Google Sheets export URLs, etc.
+ * DuckDB fetches directly from the URL.
+ */
+export type UrlDataSource = {
+    type: DataSourceType.Url;
+    /** The URL to fetch data from */
+    url: string;
+    options?: DataSourceOptions;
+};
+
+/**
+ * Stream data source - data is provided as a readable stream.
+ * Useful for large datasets or real-time data ingestion.
+ */
+export type StreamDataSource = {
+    type: DataSourceType.Stream;
+    /** The readable stream */
+    stream: NodeJS.ReadableStream;
+    options?: DataSourceOptions;
+};
+
+/**
+ * Connection data source - requires a database connection.
+ * Uses DuckDB extensions to connect to various database types.
+ * Common modules: 'sqlite', 'postgres', 'mysql', 'mongodb'
+ * @see https://duckdb.org/docs/extensions/overview.html
+ */
+export type ConnectionDataSource = {
+    type: DataSourceType.Connection;
+    /** DuckDB extension module to use (e.g., 'sqlite', 'postgres', 'mysql') */
+    module: string;
+    /** Connection string or DSN */
+    connectionString: string;
+    /** Database/collection/table name */
+    target: string;
+    options?: DataSourceOptions;
+};
+
+/**
+ * Union type for all data source definitions.
+ * Connectors return this to describe how their data should be accessed.
+ */
+export type DataSourceDefinition =
+    | InlineDataSource
+    | FileDataSource
+    | UrlDataSource
+    | StreamDataSource
+    | ConnectionDataSource;
+
+// ============================================================================
+// Application Field Types
+// ============================================================================
 
 export enum AppFieldType {
     Text = 'text',
@@ -17,9 +144,9 @@ export type AppField = {
     id: string;
     name: string;
     type: AppFieldType;
-    isRequired?: boolean;
-    isKey?: boolean;
-    encrypted?: boolean;
+    isRequired?: boolean | null;
+    isKey?: boolean | null;
+    encrypted?: boolean | null;
     referenceTo?: string | null;
     minLength?: number | null;
     maxLength?: number | null;
@@ -37,9 +164,9 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
         id: z.string(),
         name: z.string().min(1),
         type: z.enum(Object.values(AppFieldType)),
-        isRequired: z.boolean().default(true).optional(),
-        isKey: z.boolean().default(false).optional(),
-        encrypted: z.boolean().default(false).optional(),
+        isRequired: z.boolean().default(true).nullable().optional(),
+        isKey: z.boolean().default(false).nullable().optional(),
+        encrypted: z.boolean().default(false).nullable().optional(),
 
         // Reference Constraints
         referenceTo: z.string().nullable().optional(),
@@ -78,7 +205,7 @@ export const AppActionSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(Object.values(AppActionType)),
-    config: z.looseObject({}).default({}).optional()
+    config: z.looseObject({}).default({}).nullable().optional()
 });
 
 export type AppAction = z.infer<typeof AppActionSchema>;
@@ -87,7 +214,7 @@ export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     connector: z.string().min(1),
-    connectionId: z.string().optional(),
+    connectionId: z.string().nullable().optional(),
     path: z.array(z.string()).default([]),
     fields: z.array(AppFieldSchema),
     actions: z.array(AppActionSchema).default([])
@@ -156,6 +283,12 @@ export type ConnectorCapabilities = {
 
 export const TableQueryOptionsSchema = z.object({
     filters: z.array(QueryFilterSchema).optional(),
+    orderBy: z
+        .object({
+            column: z.string(),
+            direction: z.enum(['asc', 'desc'])
+        })
+        .optional(),
     limit: z.number().int().nonnegative().optional(),
     offset: z.number().int().nonnegative().optional()
 });
@@ -199,7 +332,7 @@ export abstract class Connector {
      * @param auth Auth.
      * @returns Table Schema.
      */
-    abstract getTable(path: string[], auth?: string): Promise<AppTable>;
+    abstract getTable(path: string[], auth?: string): Promise<AppTable | undefined>;
 
     /**
      * Performs the authorization exchange using the provided payload.
@@ -232,19 +365,31 @@ export abstract class Connector {
     getCapabilities?(table: AppTable, auth?: string): Promise<ConnectorCapabilities>;
 
     /**
-     * Get data from a Table.
-     * @param table Table.
+     * Get data source definition describing how to access the data.
+     * This provides metadata for query engines (like DuckDB) to efficiently
+     * access the underlying data without loading it into memory first.
+     *
+     * @param table Table to get data source for.
      * @param auth Auth.
-     * @param query Query Options.
+     * @returns Data source definition describing how to access the data.
+     *
+     * @example
+     * // Memory connector returns inline data
+     * { type: 'inline', data: [...] }
+     *
+     * @example
+     * // File connector returns file path
+     * { type: 'file', path: '/path/to/data.json', options: { format: 'json' } }
+     *
+     * @example
+     * // REST API connector returns URL
+     * { type: 'url', url: 'https://api.example.com/data', options: { format: 'json' } }
+     *
+     * @example
+     * // SQL connector returns connection info
+     * { type: 'connection', connectionString: 'postgres://...', query: 'SELECT * FROM users' }
      */
-    getData?(table: AppTable, auth?: string, query?: TableQueryOptions): Promise<AppTableRow[]>;
-
-    /**
-     * Get data from a Table as a Stream.
-     * @param table Table.
-     * @param auth Auth.
-     */
-    getDataStream?(table: AppTable, auth?: string): Promise<Readable>;
+    getData?(table: AppTable, auth?: string): Promise<DataSourceDefinition>;
 
     /**
      * Add a new Row to the Table.

@@ -21,7 +21,18 @@ export {
     type ConnectorTable,
     ConnectorTableCapability,
     QueryFilterOperator,
-    type TableQueryOptions
+    type TableQueryOptions,
+
+    // Data Source Definitions
+    DataSourceType,
+    DataSourceFormat,
+    type DataSourceOptions,
+    type DataSourceDefinition,
+    type InlineDataSource,
+    type FileDataSource,
+    type UrlDataSource,
+    type StreamDataSource,
+    type ConnectionDataSource
 } from './types.js';
 
 export { inferTable } from './utils/dataUtils.js';

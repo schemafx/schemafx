@@ -72,9 +72,8 @@ export default class SchemaFX {
         this.fastifyInstance.register(fastifyRateLimit, {
             max: 100,
             timeWindow: '1 minute',
-            allowList: ['127.0.0.1'], // Internal bypass
             errorResponseBuilder: (_, context) => ({
-                code: 429,
+                statusCode: 429,
                 error: 'Too Many Requests',
                 message: `Rate limit exceeded. Retry in ${Math.round(context.ttl / 1000)}s`
             }),
@@ -123,6 +122,15 @@ export default class SchemaFX {
                 });
             }
 
+            if ((error as unknown as Record<string, unknown>).statusCode) {
+                return reply
+                    .status((error as unknown as Record<string, unknown>).statusCode as number)
+                    .send({
+                        error: `${(error as unknown as Record<string, unknown>).error}`,
+                        message: (error as unknown as Record<string, unknown>).message
+                    });
+            }
+
             reply.log.error(error);
             return reply.status(500).send({
                 error: 'Internal Server Error',
@@ -165,7 +173,7 @@ export default class SchemaFX {
     }
 
     listen(opts?: FastifyListenOptions, callback?: (err: Error | null, address: string) => void) {
-        opts = { host: '0.0.0.0', ...(opts ?? {}) };
+        opts = { host: '0.0.0.0', port: 0, ...(opts ?? {}) };
 
         if (callback) return this.fastifyInstance.listen(opts, callback);
         return this.fastifyInstance.listen(opts);

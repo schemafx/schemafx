@@ -1,8 +1,10 @@
 import {
     Connector,
+    DataSourceType,
     type AppSchema,
     type AppTableRow,
     type AppTable,
+    type DataSourceDefinition,
     ConnectorTableCapability
 } from '../types.js';
 import { inferTable } from '../utils/dataUtils.js';
@@ -13,8 +15,8 @@ export default class MemoryConnector extends Connector {
 
     async listTables(path: string[]) {
         if (path.length > 0) return [];
-        const tables = new Set<string>();
 
+        const tables = new Set<string>();
         for (const [tableId] of this.tables) tables.add(tableId);
 
         return Array.from(tables).map(tableId => ({
@@ -26,37 +28,46 @@ export default class MemoryConnector extends Connector {
 
     async getTable(path: string[]) {
         const tableId = path[0];
+        if (!tableId) return;
+
         return inferTable(tableId, path, this.tables.get(tableId) || [], this.id);
     }
 
-    async getCapabilities() {
+    override async getCapabilities() {
         // In-Memory capabilities only.
         // Default capability handler.
         return {};
     }
 
-    async getData(table: AppTable) {
-        return [...(this.tables.get(table.path[0]) ?? [])];
+    override async getData(table: AppTable): Promise<DataSourceDefinition> {
+        if (!table.path[0]) {
+            return { type: DataSourceType.Inline, data: [] };
+        }
+
+        return {
+            type: DataSourceType.Inline,
+            data: [...(this.tables.get(table.path[0]) ?? [])]
+        };
     }
 
-    async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
-        const data = await this.getData(table);
+    override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
+        if (!table.path[0]) return;
         if (!row) return;
 
+        const data = this.tables.get(table.path[0]) ?? [];
         data.push(row);
         this.tables.set(table.path[0], data);
     }
 
-    async updateRow(
+    override async updateRow(
         table: AppTable,
         auth?: string,
         key?: Record<string, unknown>,
         row?: AppTableRow
     ) {
-        const data = await this.getData(table);
+        if (!table.path[0] || !key || !row) return;
 
-        if (!key || !row) return;
-
+        const data = this.tables.get(table.path[0]) ?? [];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex === -1) return;
@@ -65,11 +76,10 @@ export default class MemoryConnector extends Connector {
         this.tables.set(table.path[0], data);
     }
 
-    async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
-        const data = await this.getData(table);
+    override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+        if (!table.path[0] || !key) return;
 
-        if (!key) return;
-
+        const data = this.tables.get(table.path[0]) ?? [];
         const rowIndex = data.findIndex(r => Object.entries(key).every(([k, v]) => r[k] === v));
 
         if (rowIndex === -1) return;

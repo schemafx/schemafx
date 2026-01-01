@@ -85,14 +85,7 @@ describe('Encrypted Fields Integration', () => {
             }
         });
 
-        const storedData = await connector.getData!({
-            id: 'secrets',
-            name: 'Secrets',
-            connector: connector.id,
-            path: ['secrets'],
-            fields: [],
-            actions: []
-        });
+        const storedData = connector.tables.get('secrets') ?? [];
 
         expect(storedData).toHaveLength(1);
 
@@ -154,14 +147,7 @@ describe('Encrypted Fields Integration', () => {
             }
         });
 
-        const storedData = await connector.getData!({
-            id: 'secrets',
-            name: 'Secrets',
-            connector: connector.id,
-            path: ['secrets'],
-            fields: [],
-            actions: []
-        });
+        const storedData = connector.tables.get('secrets') ?? [];
 
         expect(storedData[0].secret).toBe('MySecretValue'); // Not encrypted because no key
 
@@ -213,14 +199,7 @@ describe('Encrypted Fields Integration', () => {
 
         expect(postResponse.statusCode).toBe(200);
 
-        const storedData = await connector.getData!({
-            id: 'data',
-            name: 'Data',
-            connector: connector.id,
-            path: ['data'],
-            fields: [],
-            actions: []
-        });
+        const storedData = connector.tables.get('data') ?? [];
 
         expect(storedData[0].flag).not.toBe(false);
         expect(storedData[0].flag).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
