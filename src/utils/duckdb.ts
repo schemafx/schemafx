@@ -9,7 +9,8 @@ import {
     DuckDBInstance,
     DuckDBStructValue,
     DuckDBListValue,
-    type DuckDBValue
+    type DuckDBValue,
+    DuckDBUUIDValue
 } from '@duckdb/node-api';
 
 import {
@@ -29,6 +30,8 @@ const qb = knex({ client: 'pg' });
  */
 function toPlainValue(value: unknown): unknown {
     if (value === null || value === undefined) return value;
+
+    if (value instanceof DuckDBUUIDValue) return value.toString();
 
     if (value instanceof DuckDBStructValue) {
         const result: Record<string, unknown> = {};
