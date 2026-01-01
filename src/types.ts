@@ -144,9 +144,9 @@ export type AppField = {
     id: string;
     name: string;
     type: AppFieldType;
-    isRequired?: boolean;
-    isKey?: boolean;
-    encrypted?: boolean;
+    isRequired?: boolean | null;
+    isKey?: boolean | null;
+    encrypted?: boolean | null;
     referenceTo?: string | null;
     minLength?: number | null;
     maxLength?: number | null;
@@ -164,9 +164,9 @@ export const AppFieldSchema: z.ZodType<AppField> = z.lazy(() =>
         id: z.string(),
         name: z.string().min(1),
         type: z.enum(Object.values(AppFieldType)),
-        isRequired: z.boolean().default(true).optional(),
-        isKey: z.boolean().default(false).optional(),
-        encrypted: z.boolean().default(false).optional(),
+        isRequired: z.boolean().default(true).nullable().optional(),
+        isKey: z.boolean().default(false).nullable().optional(),
+        encrypted: z.boolean().default(false).nullable().optional(),
 
         // Reference Constraints
         referenceTo: z.string().nullable().optional(),
@@ -205,7 +205,7 @@ export const AppActionSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(Object.values(AppActionType)),
-    config: z.looseObject({}).default({}).optional()
+    config: z.looseObject({}).default({}).nullable().optional()
 });
 
 export type AppAction = z.infer<typeof AppActionSchema>;
@@ -214,7 +214,7 @@ export const AppTableSchema = z.object({
     id: z.string(),
     name: z.string().min(1),
     connector: z.string().min(1),
-    connectionId: z.string().optional(),
+    connectionId: z.string().nullable().optional(),
     path: z.array(z.string()).default([]),
     fields: z.array(AppFieldSchema),
     actions: z.array(AppActionSchema).default([])

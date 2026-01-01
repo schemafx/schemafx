@@ -155,7 +155,7 @@ export default class DataService {
         this.maxRecursiveDepth = maxRecursiveDepth ?? 100;
     }
 
-    async getConnection(connectionId?: string) {
+    async getConnection(connectionId?: string | null) {
         if (!connectionId) return;
         if (this.connectionsCache.has(connectionId)) {
             return this.connectionsCache.get(connectionId);
