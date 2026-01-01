@@ -122,11 +122,13 @@ export default class SchemaFX {
                 });
             }
 
-            if (error.statusCode) {
-                return reply.status(error.statusCode).send({
-                    error: `${(error as unknown as Record<string, unknown>).error}`,
-                    message: error.message
-                });
+            if ((error as unknown as Record<string, unknown>).statusCode) {
+                return reply
+                    .status((error as unknown as Record<string, unknown>).statusCode as number)
+                    .send({
+                        error: `${(error as unknown as Record<string, unknown>).error}`,
+                        message: (error as unknown as Record<string, unknown>).message
+                    });
             }
 
             reply.log.error(error);
