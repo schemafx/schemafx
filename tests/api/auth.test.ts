@@ -2,6 +2,34 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestApp } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
+import { MemoryConnector } from '../../src/index.js';
+
+class MockAuthConnectorWithEmail extends MemoryConnector {
+    constructor() {
+        super('AuthConnectorWithEmail', 'auth-login');
+    }
+
+    async authorize(params: any) {
+        return {
+            name: 'Mock Login Connection',
+            content: JSON.stringify({ token: 'mock-token', ...params }),
+            email: 'user@example.com'
+        };
+    }
+}
+
+class MockAuthConnectorWithoutEmail extends MemoryConnector {
+    constructor() {
+        super('AuthConnectorWithoutEmail', 'auth-no-email');
+    }
+
+    async authorize(params: any) {
+        return {
+            name: 'Mock Connection Without Email',
+            content: JSON.stringify({ token: 'mock-token', ...params })
+        };
+    }
+}
 
 describe('Auth API', () => {
     let app: SchemaFX;
@@ -12,6 +40,10 @@ describe('Auth API', () => {
         app = testApp.app;
         server = app.fastifyInstance;
 
+        // Add mock auth connectors
+        app.dataService.connectors['auth-login'] = new MockAuthConnectorWithEmail();
+        app.dataService.connectors['auth-no-email'] = new MockAuthConnectorWithoutEmail();
+
         await server.ready();
     });
 
@@ -19,43 +51,58 @@ describe('Auth API', () => {
         await server.close();
     });
 
-    it('should login successfully', async () => {
+    it('should login successfully via connector', async () => {
         const response = await server.inject({
             method: 'POST',
-            url: '/api/login',
+            url: '/api/login/auth-login',
             payload: {
-                username: 'test',
-                password: 'test'
+                apiKey: 'secret'
             }
         });
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload);
         expect(body.token).toBeDefined();
+        expect(body.connectionId).toBeDefined();
+
+        const connection = await app.dataService.getConnection(body.connectionId);
+        expect(connection).toBeDefined();
+        expect(connection?.connector).toBe('auth-login');
     });
 
-    it('should fail with invalid credentials', async () => {
+    it('should fail with 404 for unknown connector', async () => {
         const response = await server.inject({
             method: 'POST',
-            url: '/api/login',
-            payload: {
-                username: 'wrong',
-                password: 'wrong'
-            }
+            url: '/api/login/unknown-connector',
+            payload: {}
+        });
+
+        expect(response.statusCode).toBe(404);
+        const body = JSON.parse(response.payload);
+        expect(body.message).toBe('Connector not found.');
+    });
+
+    it('should fail with 404 for connector without authorize', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/login/mem',
+            payload: {}
+        });
+
+        expect(response.statusCode).toBe(404);
+        const body = JSON.parse(response.payload);
+        expect(body.message).toBe('Connector not found.');
+    });
+
+    it('should fail with 401 when connector does not provide email', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/login/auth-no-email',
+            payload: {}
         });
 
         expect(response.statusCode).toBe(401);
-    });
-
-    it('should fail with missing fields', async () => {
-        const response = await server.inject({
-            method: 'POST',
-            url: '/api/login',
-            payload: {
-                username: 'test'
-            }
-        });
-
-        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.payload);
+        expect(body.message).toBe('Connector did not provide user identity.');
     });
 });

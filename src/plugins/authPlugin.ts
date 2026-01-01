@@ -1,38 +1,60 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
+import type DataService from '../services/DataService.js';
+import { randomUUID } from 'node:crypto';
 
-const plugin: FastifyPluginAsyncZod = async fastify => {
+const plugin: FastifyPluginAsyncZod<{
+    dataService: DataService;
+}> = async (fastify, { dataService }) => {
     fastify.post(
-        '/login',
+        '/login/:connectorName',
         {
             schema: {
-                body: z.object({
-                    username: z.string().min(1).meta({ description: 'Username' }),
-                    password: z.string().min(1).meta({ description: 'Password' })
+                params: z.object({
+                    connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
                 }),
+                body: z.looseObject({}),
                 response: {
                     200: z.object({
-                        token: z.string().meta({ description: 'JWT Token' })
+                        token: z.string().meta({ description: 'JWT Token' }),
+                        connectionId: z.string().meta({ description: 'Connection ID' })
                     }),
-                    401: ErrorResponseSchema
+                    401: ErrorResponseSchema,
+                    404: ErrorResponseSchema
                 }
             }
         },
         async (request, reply) => {
-            const { username, password } = request.body;
-            const isValid = username === 'test' && password === 'test';
+            const connector = dataService.connectors[request.params.connectorName];
 
-            if (isValid) {
-                return {
-                    token: fastify.jwt.sign({ id: username }, { expiresIn: '8h' })
-                };
+            if (!connector?.authorize) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Connector not found.'
+                });
             }
 
-            return reply.code(401).send({
-                error: 'Unauthorized',
-                message: 'Invalid credentials.'
+            const authResult = await connector.authorize({ ...request.body });
+
+            if (!authResult.email) {
+                return reply.code(401).send({
+                    error: 'Unauthorized',
+                    message: 'Connector did not provide user identity.'
+                });
+            }
+
+            const connection = await dataService.setConnection({
+                id: randomUUID(),
+                connector: connector.id,
+                name: authResult.name,
+                content: authResult.content
             });
+
+            return {
+                token: fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' }),
+                connectionId: connection.id
+            };
         }
     );
 };

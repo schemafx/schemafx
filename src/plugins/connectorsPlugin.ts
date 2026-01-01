@@ -144,7 +144,13 @@ const plugin: FastifyPluginAsyncZod<{
                 }),
                 querystring: z.looseObject({}),
                 response: {
-                    200: z.object({ connectionId: z.string() }),
+                    200: z.object({
+                        connectionId: z.string(),
+                        token: z
+                            .string()
+                            .optional()
+                            .meta({ description: 'JWT token if email is provided by connector' })
+                    }),
                     404: ErrorResponseSchema
                 }
             }
@@ -159,13 +165,23 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
+            const authResult = await connector.authorize({ ...request.query });
             const connection = await dataService.setConnection({
                 id: randomUUID(),
                 connector: connector.id,
-                ...(await connector.authorize({ ...request.query }))
+                name: authResult.name,
+                content: authResult.content
             });
 
-            return reply.code(200).send({ connectionId: connection.id });
+            const response: { connectionId: string; token?: string } = {
+                connectionId: connection.id
+            };
+
+            if (authResult.email) {
+                response.token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+            }
+
+            return reply.code(200).send(response);
         }
     );
 
@@ -178,7 +194,13 @@ const plugin: FastifyPluginAsyncZod<{
                 }),
                 body: z.looseObject({}),
                 response: {
-                    200: z.object({ connectionId: z.string() }),
+                    200: z.object({
+                        connectionId: z.string(),
+                        token: z
+                            .string()
+                            .optional()
+                            .meta({ description: 'JWT token if email is provided by connector' })
+                    }),
                     404: ErrorResponseSchema
                 }
             }
@@ -193,13 +215,23 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
+            const authResult = await connector.authorize({ ...request.body });
             const connection = await dataService.setConnection({
                 id: randomUUID(),
                 connector: connector.id,
-                ...(await connector.authorize({ ...request.body }))
+                name: authResult.name,
+                content: authResult.content
             });
 
-            return reply.code(200).send({ connectionId: connection.id });
+            const response: { connectionId: string; token?: string } = {
+                connectionId: connection.id
+            };
+
+            if (authResult.email) {
+                response.token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+            }
+
+            return reply.code(200).send(response);
         }
     );
 

@@ -21,6 +21,24 @@ class MockAuthConnector extends MemoryConnector {
     }
 }
 
+class MockAuthConnectorWithEmail extends MemoryConnector {
+    constructor() {
+        super('AuthConnectorWithEmail', 'auth-conn-email');
+    }
+
+    async getAuthUrl() {
+        return 'http://example.com/auth/email';
+    }
+
+    async authorize(params: any) {
+        return {
+            name: 'Mock Connection With Email',
+            content: JSON.stringify({ token: 'mock-token', ...params }),
+            email: 'user@example.com'
+        };
+    }
+}
+
 describe('Connectors API', () => {
     let app: SchemaFX;
     let server: FastifyInstance;
@@ -34,6 +52,7 @@ describe('Connectors API', () => {
 
         // Add mock auth connector
         app.dataService.connectors['auth-conn'] = new MockAuthConnector();
+        app.dataService.connectors['auth-conn-email'] = new MockAuthConnectorWithEmail();
 
         // Create a connection for the memory connector
         await app.dataService.setConnection({
@@ -201,6 +220,24 @@ describe('Connectors API', () => {
         expect(connection?.name).toBe('Mock Connection');
     });
 
+    it('should handle authorize callback with email and return token', async () => {
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/connectors/auth-conn-email/auth/callback',
+            query: { code: '123' }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        expect(body.connectionId).toBeDefined();
+        expect(body.token).toBeDefined();
+
+        const connection = await app.dataService.getConnection(body.connectionId);
+        expect(connection).toBeDefined();
+        expect(connection?.connector).toBe('auth-conn-email');
+        expect(connection?.name).toBe('Mock Connection With Email');
+    });
+
     it('should return 404 for connector without authorize (POST)', async () => {
         const response = await server.inject({
             method: 'POST',
@@ -228,6 +265,24 @@ describe('Connectors API', () => {
         expect(connection).toBeDefined();
         expect(connection?.connector).toBe('auth-conn');
         expect(connection?.name).toBe('Mock Connection');
+    });
+
+    it('should handle authorize POST with email and return token', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/connectors/auth-conn-email/auth',
+            payload: { apiKey: 'secret' }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.payload);
+        expect(body.connectionId).toBeDefined();
+        expect(body.token).toBeDefined();
+
+        const connection = await app.dataService.getConnection(body.connectionId);
+        expect(connection).toBeDefined();
+        expect(connection?.connector).toBe('auth-conn-email');
+        expect(connection?.name).toBe('Mock Connection With Email');
     });
 
     it('should return 404 if appId does not exist when adding table', async () => {

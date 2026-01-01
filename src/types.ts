@@ -337,8 +337,11 @@ export abstract class Connector {
     /**
      * Performs the authorization exchange using the provided payload.
      * @param body - A key-value object containing the credentials or payload required for authorization.
+     * @returns An object containing the connection name, content, and optional email for user authentication.
      */
-    authorize?(body: Record<string, unknown>): Promise<{ name: string; content: string }>;
+    authorize?(
+        body: Record<string, unknown>
+    ): Promise<{ name: string; content: string; email?: string }>;
 
     /** Generates the URL required to initiate an OAuth authorization flow. */
     getAuthUrl?(): Promise<string>;
