@@ -192,6 +192,34 @@ describe('Connectors API', () => {
         expect(response.headers.location).toBe('http://example.com/auth');
     });
 
+    it('should handle full OAuth flow with redirectUri in query and redirect back', async () => {
+        const authResponse = await server.inject({
+            method: 'GET',
+            url: '/api/connectors/auth-conn/auth',
+            query: { redirectUri: 'http://localhost:3000/callback' }
+        });
+
+        expect(authResponse.statusCode).toBe(302);
+        const authLocation = new URL(authResponse.headers.location!);
+        const state = authLocation.searchParams.get('state');
+        expect(state).toBeDefined();
+
+        // Verify state contains the redirectUri
+        const stateData = JSON.parse(Buffer.from(state!, 'base64url').toString());
+        expect(stateData.redirectUri).toBe('http://localhost:3000/callback');
+
+        const callbackResponse = await server.inject({
+            method: 'GET',
+            url: '/api/connectors/auth-conn/auth/callback',
+            query: { code: '123', state: state! }
+        });
+
+        expect(callbackResponse.statusCode).toBe(302);
+        const callbackLocation = new URL(callbackResponse.headers.location!);
+        expect(callbackLocation.href.startsWith('http://localhost:3000/callback')).toBe(true);
+        expect(callbackLocation.searchParams.get('connectionId')).toBeDefined();
+    });
+
     it('should return 404 for connector without authorize (callback)', async () => {
         const response = await server.inject({
             method: 'GET',
@@ -201,6 +229,35 @@ describe('Connectors API', () => {
         expect(response.statusCode).toBe(404);
         const body = JSON.parse(response.payload);
         expect(body.message).toBe('Connector not found.');
+    });
+
+    it('should handle authorize callback with state redirectUri', async () => {
+        const stateData = { redirectUri: 'http://localhost:3000/callback' };
+        const state = Buffer.from(JSON.stringify(stateData)).toString('base64url');
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/connectors/auth-conn/auth/callback',
+            query: { code: '123', state }
+        });
+
+        expect(response.statusCode).toBe(302);
+        const location = response.headers.location as string;
+        expect(location).toContain('http://localhost:3000/callback');
+        expect(location).toContain('connectionId=');
+    });
+
+    it('should handle authorize callback with empty state', async () => {
+        const stateData = {};
+        const state = Buffer.from(JSON.stringify(stateData)).toString('base64url');
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/connectors/auth-conn/auth/callback',
+            query: { code: '123', state }
+        });
+
+        expect(response.statusCode).toBe(200);
     });
 
     it('should handle authorize callback', async () => {
