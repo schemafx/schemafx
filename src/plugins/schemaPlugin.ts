@@ -9,7 +9,8 @@ import {
     AppTableSchema,
     AppViewSchema,
     AppFieldSchema,
-    AppActionSchema
+    AppActionSchema,
+    type AppSchema
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
 import type DataService from '../services/DataService.js';
@@ -39,6 +40,18 @@ const plugin: FastifyPluginAsyncZod<{
 
             return schema;
         }
+    );
+
+    fastify.get(
+        '/apps',
+        {
+            schema: {
+                response: {
+                    200: z.array(AppSchemaSchema)
+                }
+            }
+        },
+        async () => dataService.getData(dataService.schemaTable) as Promise<AppSchema[]>
     );
 
     fastify.post(
