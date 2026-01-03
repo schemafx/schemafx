@@ -268,19 +268,16 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.connectionId).toBeDefined();
 
-        const connectionId = response.body.match(/"connectionId":"(?<connectionId>[^"]+?)"/m)
-            ?.groups?.connectionId;
-
-        expect(connectionId).toBeDefined();
-
-        const connection = await app.dataService.getConnection(connectionId);
+        const connection = await app.dataService.getConnection(body.connectionId);
         expect(connection).toBeDefined();
         expect(connection?.connector).toBe('auth-conn');
         expect(connection?.name).toBe('Mock Connection');
     });
 
-    it('should handle authorize callback with email and return token', async () => {
+    it('should handle authorize callback with email and return code', async () => {
         const response = await server.inject({
             method: 'GET',
             url: '/api/connectors/auth-conn-email/auth/callback',
@@ -288,17 +285,30 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.connectionId).toBeDefined();
+        expect(body.code).toBeDefined();
 
-        const connectionId = response.body.match(/"connectionId":"(?<connectionId>[^"]+?)"/m)
-            ?.groups?.connectionId;
-
-        expect(connectionId).toBeDefined();
-        expect(response.body.match(/"token":"(?<token>[^"]+?)"/m)?.groups?.token).toBeDefined();
-
-        const connection = await app.dataService.getConnection(connectionId);
+        const connection = await app.dataService.getConnection(body.connectionId);
         expect(connection).toBeDefined();
         expect(connection?.connector).toBe('auth-conn-email');
         expect(connection?.name).toBe('Mock Connection With Email');
+
+        const tokenResponse = await server.inject({
+            method: 'GET',
+            url: `/api/token/${body.code}`
+        });
+
+        expect(response.statusCode).toBe(200);
+        const tokenBody = JSON.parse(tokenResponse.body);
+        expect(tokenBody.token).toBeDefined();
+
+        const secondTokenResponse = await server.inject({
+            method: 'GET',
+            url: `/api/token/${body.code}`
+        });
+
+        expect(secondTokenResponse.statusCode).toBe(404);
     });
 
     it('should return 404 for connector without authorize (POST)', async () => {
@@ -330,7 +340,7 @@ describe('Connectors API', () => {
         expect(connection?.name).toBe('Mock Connection');
     });
 
-    it('should handle authorize POST with email and return token', async () => {
+    it('should handle authorize POST with email and return code', async () => {
         const response = await server.inject({
             method: 'POST',
             url: '/api/connectors/auth-conn-email/auth',
@@ -340,12 +350,21 @@ describe('Connectors API', () => {
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload);
         expect(body.connectionId).toBeDefined();
-        expect(body.token).toBeDefined();
+        expect(body.code).toBeDefined();
 
         const connection = await app.dataService.getConnection(body.connectionId);
         expect(connection).toBeDefined();
         expect(connection?.connector).toBe('auth-conn-email');
         expect(connection?.name).toBe('Mock Connection With Email');
+
+        // Exchange code for token
+        const tokenResponse = await server.inject({
+            method: 'GET',
+            url: `/api/token/${body.code}`
+        });
+        expect(tokenResponse.statusCode).toBe(200);
+        const tokenBody = JSON.parse(tokenResponse.body);
+        expect(tokenBody.token).toBeDefined();
     });
 
     it('should return 404 if appId does not exist when adding table', async () => {

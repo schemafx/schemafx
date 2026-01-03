@@ -6,10 +6,56 @@ import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
 import { randomUUID, randomBytes } from 'node:crypto';
 import type DataService from '../services/DataService.js';
+import { LRUCache } from 'lru-cache';
+
+const tokenCodeCache = new LRUCache<string, string>({
+    max: 1000,
+    ttl: 2 * 60 * 1000 // 2 minutes
+});
+
+function storeTokenCode(token: string): string {
+    const code = randomBytes(32).toString('base64url');
+    tokenCodeCache.set(code, token);
+
+    return code;
+}
+
+function consumeTokenCode(code: string): string | undefined {
+    const token = tokenCodeCache.get(code);
+    if (token) tokenCodeCache.delete(code);
+
+    return token;
+}
 
 const plugin: FastifyPluginAsyncZod<{
     dataService: DataService;
 }> = async (fastify, { dataService }) => {
+    fastify.get(
+        '/token/:code',
+        {
+            schema: {
+                params: z.object({
+                    code: z.string().min(1).meta({ description: 'Token exchange code' })
+                }),
+                response: {
+                    200: z.object({
+                        token: z.string().meta({ description: 'JWT token' })
+                    }),
+                    404: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const token = consumeTokenCode(request.params.code);
+            if (token) return { token };
+
+            return reply.code(404).send({
+                error: 'Not Found',
+                message: 'Token code not found or expired.'
+            });
+        }
+    );
+
     fastify.get(
         '/connectors',
         {
@@ -189,12 +235,13 @@ const plugin: FastifyPluginAsyncZod<{
                 content: authResult.content
             });
 
-            const response: { connectionId: string; token?: string } = {
+            const response: { connectionId: string; code?: string } = {
                 connectionId: connection.id
             };
 
             if (authResult.email) {
-                response.token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+                const token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+                response.code = storeTokenCode(token);
             }
 
             try {
@@ -214,23 +261,7 @@ const plugin: FastifyPluginAsyncZod<{
                 }
             } catch {}
 
-            const nonce = randomBytes(16).toString('base64');
-            return reply
-                .header('Content-Security-Policy', `script-src 'self' 'nonce-${nonce}'`)
-                .header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-                .type('text/html').send(`<!doctype html>
-                    <html>
-                        <head>
-                            <title>Auth Complete</title>
-                            <script nonce="${nonce}">
-                                if (window.opener) window.opener.postMessage(JSON.stringify(${JSON.stringify(response)}), '*');
-                                else new BroadcastChannel('auth_channel').postMessage(JSON.stringify(${JSON.stringify(response)}));
-                                window.close();
-                            </script>
-                        </head>
-                        <body><p>Authentication successful!</p></body>
-                    </html>
-                `);
+            return response;
         }
     );
 
@@ -245,10 +276,10 @@ const plugin: FastifyPluginAsyncZod<{
                 response: {
                     200: z.object({
                         connectionId: z.string(),
-                        token: z
+                        code: z
                             .string()
                             .optional()
-                            .meta({ description: 'JWT token if email is provided by connector' })
+                            .meta({ description: 'Code to exchange for token' })
                     }),
                     404: ErrorResponseSchema
                 }
@@ -272,12 +303,13 @@ const plugin: FastifyPluginAsyncZod<{
                 content: authResult.content
             });
 
-            const response: { connectionId: string; token?: string } = {
+            const response: { connectionId: string; code?: string } = {
                 connectionId: connection.id
             };
 
             if (authResult.email) {
-                response.token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+                const token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+                response.code = storeTokenCode(token);
             }
 
             return reply.code(200).send(response);
