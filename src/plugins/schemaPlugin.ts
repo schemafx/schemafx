@@ -51,6 +51,34 @@ const plugin: FastifyPluginAsyncZod<{
         async () => dataService.getData(dataService.schemaTable) as Promise<AppSchema[]>
     );
 
+    fastify.delete(
+        '/apps/:appId',
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                params: z.object({ appId: z.string().min(1) }),
+                response: {
+                    200: z.object({ success: z.boolean() }),
+                    404: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const { appId } = request.params;
+            const schema = await dataService.getSchema(appId);
+
+            if (!schema) {
+                return reply.code(404).send({
+                    error: 'Not Found',
+                    message: 'Application not found.'
+                });
+            }
+
+            await dataService.deleteSchema(appId);
+            return { success: true };
+        }
+    );
+
     fastify.post(
         '/apps/:appId/schema',
         {

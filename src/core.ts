@@ -64,7 +64,7 @@ export default class SchemaFX {
 
         this.fastifyInstance.register(fastifyCors, {
             origin: true,
-            methods: ['GET', 'POST', 'OPTIONS'],
+            methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
             allowedHeaders: ['Content-Type', 'Authorization'],
             ...(opts.corsOpts ?? {})
         });
