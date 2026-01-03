@@ -309,13 +309,18 @@ export const ConnectorTableSchema = z.object({
 
 export type ConnectorTable = z.infer<typeof ConnectorTableSchema>;
 
+export type ConnectorOptions = {
+    name: string;
+    id?: string;
+};
+
 export abstract class Connector {
     name: string;
     id: string;
 
-    constructor(name: string, id?: string) {
-        this.name = name;
-        this.id = id ?? name;
+    constructor(opts: ConnectorOptions) {
+        this.name = opts.name;
+        this.id = opts.id ?? opts.name;
     }
 
     /**
@@ -337,8 +342,11 @@ export abstract class Connector {
     /**
      * Performs the authorization exchange using the provided payload.
      * @param body - A key-value object containing the credentials or payload required for authorization.
+     * @returns An object containing the connection name, content, and optional email for user authentication.
      */
-    authorize?(body: Record<string, unknown>): Promise<{ name: string; content: string }>;
+    authorize?(
+        body: Record<string, unknown>
+    ): Promise<{ name: string; content: string; email?: string }>;
 
     /** Generates the URL required to initiate an OAuth authorization flow. */
     getAuthUrl?(): Promise<string>;

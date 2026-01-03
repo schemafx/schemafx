@@ -29,7 +29,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -49,7 +49,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             corsOpts: { origin: false },
             rateLimitOpts: { max: 50 },
@@ -82,7 +82,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             rateLimitOpts: { max: 2, timeWindow: '10 minutes' }
         });
@@ -131,7 +131,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             corsOpts: { origin: false },
             rateLimitOpts: { max: 50 },
@@ -176,7 +176,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -200,7 +200,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -221,7 +221,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -242,7 +242,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -269,7 +269,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -306,7 +306,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -355,6 +355,31 @@ describe('Core SchemaFX', () => {
         await server.close();
     });
 
+    it('should handle Fastify validation error with .validation property', async () => {
+        const { app } = await createTestApp(false);
+        const server = app.fastifyInstance;
+
+        server.get('/fastify-validation-error', async () => {
+            const error: any = new Error('Fastify Validation Error');
+            error.validation = [{ field: 'test', message: 'invalid' }];
+            throw error;
+        });
+
+        await server.ready();
+
+        const response = await server.inject({
+            method: 'GET',
+            url: '/fastify-validation-error'
+        });
+
+        expect(response.statusCode).toBe(400);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Bad Request');
+        expect(body.details).toBeDefined();
+
+        await server.close();
+    });
+
     it('should handle FST_ERR_VALIDATION code manually', async () => {
         const { app } = await createTestApp(false);
         const server = app.fastifyInstance;
@@ -392,7 +417,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
         const server = app.fastifyInstance;
@@ -405,7 +430,7 @@ describe('Core SchemaFX', () => {
 
         await server.ready();
 
-        const token = app.fastifyInstance.jwt.sign({ id: 'test' });
+        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
 
         const response = await server.inject({
             method: 'GET',

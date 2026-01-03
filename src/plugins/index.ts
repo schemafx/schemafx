@@ -9,7 +9,7 @@ const plugin: FastifyPluginAsyncZod<{ dataService: DataService }> = async (
     fastify,
     { dataService }
 ) => {
-    fastify.register(authPlugin);
+    fastify.register(authPlugin, { dataService });
     fastify.register(connectorsPlugin, { dataService });
     fastify.register(schemaPlugin, { dataService });
     fastify.register(dataPlugin, { dataService });

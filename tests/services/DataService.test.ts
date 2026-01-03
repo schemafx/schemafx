@@ -1,13 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import DataService, { DataServiceOptions } from '../../src/services/DataService.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
-import {
-    AppActionType,
-    AppFieldType,
-    AppSchema,
-    Connector,
-    ConnectorTable
-} from '../../src/types.js';
+import { AppActionType, AppFieldType, type AppSchema, Connector } from '../../src/types.js';
 
 describe('DataService', () => {
     let dataService: DataService;
@@ -15,7 +9,7 @@ describe('DataService', () => {
     let options: DataServiceOptions;
 
     beforeEach(() => {
-        connector = new MemoryConnector('mem', 'mem');
+        connector = new MemoryConnector({ name: 'mem' });
         options = {
             schemaConnector: {
                 connector: connector.id,
@@ -380,7 +374,7 @@ describe('DataService', () => {
                 async getTable() {
                     return undefined;
                 }
-            })('minimal');
+            })({ name: 'minimal' });
 
             const minimalOptions: DataServiceOptions = {
                 schemaConnector: {

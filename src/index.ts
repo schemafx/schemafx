@@ -17,6 +17,7 @@ export {
     AppViewType,
     type AppSchema,
     Connector,
+    type ConnectorOptions,
     type ConnectorCapabilities,
     type ConnectorTable,
     ConnectorTableCapability,

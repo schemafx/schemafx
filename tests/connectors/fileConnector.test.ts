@@ -21,7 +21,7 @@ describe('FileConnector', () => {
             await unlink(TEST_DB_PATH);
         } catch {}
 
-        connector = new FileConnector('File', TEST_DB_PATH, connectorId);
+        connector = new FileConnector({ name: 'File', id: connectorId, filePath: TEST_DB_PATH });
     });
 
     afterEach(async () => {
@@ -37,7 +37,7 @@ describe('FileConnector', () => {
     });
 
     it('should generate id if not provided', () => {
-        const conn = new FileConnector('Test', TEST_DB_PATH);
+        const conn = new FileConnector({ name: 'Test', filePath: TEST_DB_PATH });
         expect(conn.id).toBeDefined();
         expect(conn.id.length).toBeGreaterThan(0);
     });

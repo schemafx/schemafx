@@ -3,6 +3,9 @@
     "version": "0.0.0",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
     "author": "SchemaFX",
     "description": "Build Without Boundaries.",
     "bugs": {
@@ -13,9 +16,10 @@
         "url": "https://github.com/schemafx/schemafx.git"
     },
     "scripts": {
-        "build": "tsc",
+        "build": "npm run build:clean && tsc -b --clean && tsc -b",
+        "build:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true })\"",
         "start": "node .",
-        "dev": "tsx watch src/dev.ts",
+        "dev": "tsx watch dev/dev.ts --watch ./src --watch ./dev",
         "prepare": "npm run build",
         "lint": "eslint",
         "lint:fix": "eslint --fix",

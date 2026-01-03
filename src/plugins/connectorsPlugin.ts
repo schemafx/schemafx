@@ -4,7 +4,7 @@ import { AppSchemaSchema, ConnectorTableSchema } from '../types.js';
 import { validateTableKeys } from '../utils/schemaUtils.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import type DataService from '../services/DataService.js';
 
 const plugin: FastifyPluginAsyncZod<{
@@ -35,6 +35,9 @@ const plugin: FastifyPluginAsyncZod<{
                                     .meta({ description: 'Connection details.' }),
                                 requiresConnection: z.boolean().default(false).meta({
                                     description: 'Whether the connector must be reconnected.'
+                                }),
+                                supportsData: z.boolean().default(false).meta({
+                                    description: 'Whether the connector supports getting data.'
                                 })
                             })
                         )
@@ -50,7 +53,8 @@ const plugin: FastifyPluginAsyncZod<{
                     const base = {
                         id: connector.id,
                         name: connector.name,
-                        requiresConnection: !!connector.authorize
+                        requiresConnection: !!connector.authorize,
+                        supportsData: !!connector.getData
                     };
 
                     return [
@@ -116,6 +120,13 @@ const plugin: FastifyPluginAsyncZod<{
                 params: z.object({
                     connectorName: z.string().min(1).meta({ description: 'Name of the connector' })
                 }),
+                querystring: z.object({
+                    redirectUri: z
+                        .string()
+                        .min(1)
+                        .optional()
+                        .meta({ description: 'Redirect Uri after login.' })
+                }),
                 response: {
                     404: ErrorResponseSchema
                 }
@@ -131,7 +142,17 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            return reply.redirect(await connector.getAuthUrl(), 302);
+            const url = new URL(await connector.getAuthUrl());
+            if (Object.keys(request.query).length > 0) {
+                url.searchParams.set(
+                    'state',
+                    Buffer.from(JSON.stringify({ ...request.query })).toString('base64url')
+                );
+            }
+
+            return reply
+                .header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+                .redirect(url.href, 302);
         }
     );
 
@@ -144,7 +165,7 @@ const plugin: FastifyPluginAsyncZod<{
                 }),
                 querystring: z.looseObject({}),
                 response: {
-                    200: z.object({ connectionId: z.string() }),
+                    200: z.any(),
                     404: ErrorResponseSchema
                 }
             }
@@ -159,13 +180,57 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
+            const { state, ...query } = request.query;
+            const authResult = await connector.authorize({ ...query });
             const connection = await dataService.setConnection({
                 id: randomUUID(),
                 connector: connector.id,
-                ...(await connector.authorize({ ...request.query }))
+                name: authResult.name,
+                content: authResult.content
             });
 
-            return reply.code(200).send({ connectionId: connection.id });
+            const response: { connectionId: string; token?: string } = {
+                connectionId: connection.id
+            };
+
+            if (authResult.email) {
+                response.token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+            }
+
+            try {
+                if (state) {
+                    const stateData = JSON.parse(
+                        Buffer.from(state as string, 'base64url').toString()
+                    );
+
+                    if (stateData.redirectUri) {
+                        const redirect = new URL(stateData.redirectUri as string);
+                        for (const [k, v] of Object.entries(response)) {
+                            redirect.searchParams.set(k, v);
+                        }
+
+                        return reply.redirect(redirect.href, 302);
+                    }
+                }
+            } catch {}
+
+            const nonce = randomBytes(16).toString('base64');
+            return reply
+                .header('Content-Security-Policy', `script-src 'self' 'nonce-${nonce}'`)
+                .header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+                .type('text/html').send(`<!doctype html>
+                    <html>
+                        <head>
+                            <title>Auth Complete</title>
+                            <script nonce="${nonce}">
+                                if (window.opener) window.opener.postMessage(JSON.stringify(${JSON.stringify(response)}), '*');
+                                else new BroadcastChannel('auth_channel').postMessage(JSON.stringify(${JSON.stringify(response)}));
+                                window.close();
+                            </script>
+                        </head>
+                        <body><p>Authentication successful!</p></body>
+                    </html>
+                `);
         }
     );
 
@@ -178,7 +243,13 @@ const plugin: FastifyPluginAsyncZod<{
                 }),
                 body: z.looseObject({}),
                 response: {
-                    200: z.object({ connectionId: z.string() }),
+                    200: z.object({
+                        connectionId: z.string(),
+                        token: z
+                            .string()
+                            .optional()
+                            .meta({ description: 'JWT token if email is provided by connector' })
+                    }),
                     404: ErrorResponseSchema
                 }
             }
@@ -193,13 +264,23 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
+            const authResult = await connector.authorize({ ...request.body });
             const connection = await dataService.setConnection({
                 id: randomUUID(),
                 connector: connector.id,
-                ...(await connector.authorize({ ...request.body }))
+                name: authResult.name,
+                content: authResult.content
             });
 
-            return reply.code(200).send({ connectionId: connection.id });
+            const response: { connectionId: string; token?: string } = {
+                connectionId: connection.id
+            };
+
+            if (authResult.email) {
+                response.token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
+            }
+
+            return reply.code(200).send(response);
         }
     );
 

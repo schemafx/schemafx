@@ -4,7 +4,7 @@ import type SchemaFX from '../../src/index.js';
 import {
     AppFieldType,
     type Connector,
-    AppSchema,
+    type AppSchema,
     AppViewType,
     AppActionType
 } from '../../src/types.js';

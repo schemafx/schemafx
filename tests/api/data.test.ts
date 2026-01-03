@@ -4,8 +4,7 @@ import SchemaFX from '../../src/index.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
 import {
     Connector,
-    AppSchema,
-    AppTable,
+    type AppTable,
     AppFieldType,
     AppActionType,
     QueryFilterOperator,
@@ -18,7 +17,7 @@ class LimitedConnector extends Connector {
     private data: any[] = [];
 
     constructor() {
-        super('Limited', 'limited');
+        super({ name: 'Limited', id: 'limited' });
         this.data = [
             { id: 1, name: 'Alice', age: 30 },
             { id: 2, name: 'Bob', age: 25 },
@@ -402,7 +401,7 @@ describe('Data API', () => {
 describe('Data API Manual Filtering (Limited Connector)', () => {
     it('should perform manual filtering and pagination', async () => {
         const limitedConnector = new LimitedConnector();
-        const memConnector = new MemoryConnector('Mem', 'mem');
+        const memConnector = new MemoryConnector({ name: 'Mem', id: 'mem' });
 
         const app = new SchemaFX({
             jwtOpts: { secret: 'secret' },
@@ -421,7 +420,7 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
 
         const server = app.fastifyInstance;
         await server.ready();
-        const token = app.fastifyInstance.jwt.sign({ sub: 'user' });
+        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
 
         const schema = {
             id: 'limited-app',

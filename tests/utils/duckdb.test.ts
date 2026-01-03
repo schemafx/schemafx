@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { getData, QueryFilterOperator } from '../../src/utils/duckdb';
 import { DataSourceType, DataSourceFormat } from '../../src/types';
 
@@ -17,6 +18,30 @@ describe('DuckDB Utils', () => {
 
             expect(result).toHaveLength(3);
             expect(result).toEqual(testData);
+        });
+
+        it('should handle UUID values from randomUUID()', async () => {
+            const uuid = randomUUID();
+            const dataWithUUID = [{ id: uuid, name: 'Test' }];
+            const result = await getData({
+                source: { type: DataSourceType.Inline, data: dataWithUUID }
+            });
+
+            expect(result).toHaveLength(1);
+            expect(result[0].id).toBe(uuid);
+        });
+
+        it('should handle data with undefined values in nested objects', async () => {
+            const dataWithUndefined = [
+                { id: 1, name: 'Test', meta: { value: undefined, other: 'data' } }
+            ];
+            const result = (await getData({
+                source: { type: DataSourceType.Inline, data: dataWithUndefined }
+            })) as unknown as typeof dataWithUndefined;
+
+            expect(result).toHaveLength(1);
+            expect(result[0]?.meta.value).toBeUndefined(); // undefined stays undefined in toPlainValue
+            expect(result[0]?.meta.other).toBe('data');
         });
 
         it('should return empty array for empty data', async () => {
@@ -693,6 +718,40 @@ describe('DuckDB Utils', () => {
 
             expect(result).toHaveLength(1);
             expect(result[0]).toHaveProperty('id', 2);
+        });
+
+        it('should throw error when URL headers contain control characters in key', async () => {
+            await expect(
+                getData({
+                    source: {
+                        type: DataSourceType.Url,
+                        url: 'https://jsonplaceholder.typicode.com/users/1',
+                        options: {
+                            format: DataSourceFormat.Json,
+                            headers: {
+                                'X-Bad\x00Header': 'value'
+                            }
+                        }
+                    }
+                })
+            ).rejects.toThrow('header contains control characters');
+        });
+
+        it('should throw error when URL headers contain control characters in value', async () => {
+            await expect(
+                getData({
+                    source: {
+                        type: DataSourceType.Url,
+                        url: 'https://jsonplaceholder.typicode.com/users/1',
+                        options: {
+                            format: DataSourceFormat.Json,
+                            headers: {
+                                'X-Custom-Header': 'bad\x1Fvalue'
+                            }
+                        }
+                    }
+                })
+            ).rejects.toThrow('header contains control characters');
         });
     });
 });

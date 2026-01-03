@@ -4,17 +4,22 @@ import SchemaFX, {
     AppViewType,
     AppActionType,
     AppFieldType
-} from './index.js';
+} from '../src/index.js';
 import path from 'path';
+import AuthConnector from './connectors/authConnector.js';
 
-const dbPath = path.join(process.cwd(), 'database.json');
+const port = 3000;
+const filePath = path.join(process.cwd(), 'dev/database.json');
 
-const memoryConnector = new MemoryConnector('Memory', 'memory');
-const fileConnector = new FileConnector('File System', dbPath, 'file');
+const memoryConnector = new MemoryConnector({ name: 'Memory', id: 'memory' });
+const fileConnector = new FileConnector({ name: 'File System', id: 'file', filePath });
 const defaultConnector = fileConnector.id;
 const app = new SchemaFX({
     jwtOpts: {
         secret: 'my-very-secret'
+    },
+    fastifyOpts: {
+        logger: { level: 'error' }
     },
     dataServiceOpts: {
         schemaConnector: {
@@ -25,13 +30,18 @@ const app = new SchemaFX({
             connector: defaultConnector,
             path: ['connections']
         },
-        connectors: [memoryConnector, fileConnector],
+        connectors: [
+            memoryConnector,
+            fileConnector,
+            new AuthConnector({ name: 'Dev', serverUri: `http://localhost:${port}/` })
+        ],
         encryptionKey:
             process.env.ENCRYPTION_KEY ||
             '1234567890123456789012345678901234567890123456789012345678901234'
     }
 });
 
+// Default dev application.
 const devAppId = '123';
 if (!(await app.dataService.getSchema(devAppId))) {
     await app.dataService.setSchema({
@@ -145,7 +155,6 @@ if (!(await app.dataService.getSchema(devAppId))) {
 }
 
 try {
-    const port = 3000;
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`\n🚀 Server listening at http://localhost:${port}/`);
 } catch (err) {
