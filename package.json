@@ -15,7 +15,7 @@
     "scripts": {
         "build": "tsc",
         "start": "node .",
-        "dev": "tsx watch src/dev.ts",
+        "dev": "tsx watch dev/dev.ts --watch ./src --watch ./dev",
         "prepare": "npm run build",
         "lint": "eslint",
         "lint:fix": "eslint --fix",

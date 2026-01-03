@@ -4,10 +4,10 @@ import SchemaFX, {
     AppViewType,
     AppActionType,
     AppFieldType
-} from './index.js';
+} from '../src/index.js';
 import path from 'path';
 
-const dbPath = path.join(process.cwd(), 'database.json');
+const dbPath = path.join(process.cwd(), 'dev/database.json');
 
 const memoryConnector = new MemoryConnector('Memory', 'memory');
 const fileConnector = new FileConnector('File System', dbPath, 'file');
@@ -32,6 +32,7 @@ const app = new SchemaFX({
     }
 });
 
+// Default dev application.
 const devAppId = '123';
 if (!(await app.dataService.getSchema(devAppId))) {
     await app.dataService.setSchema({
