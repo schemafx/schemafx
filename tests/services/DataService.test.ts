@@ -1,13 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import DataService, { DataServiceOptions } from '../../src/services/DataService.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
-import {
-    AppActionType,
-    AppFieldType,
-    AppSchema,
-    Connector,
-    ConnectorTable
-} from '../../src/types.js';
+import { AppActionType, AppFieldType, type AppSchema, Connector } from '../../src/types.js';
 
 describe('DataService', () => {
     let dataService: DataService;

@@ -50,7 +50,7 @@ export default class MemoryConnector extends Connector {
         };
     }
 
-    override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
+    override async addRow(table: AppTable, _?: string, row?: AppTableRow) {
         if (!table.path[0]) return;
         if (!row) return;
 
@@ -61,7 +61,7 @@ export default class MemoryConnector extends Connector {
 
     override async updateRow(
         table: AppTable,
-        auth?: string,
+        _?: string,
         key?: Record<string, unknown>,
         row?: AppTableRow
     ) {
@@ -76,7 +76,7 @@ export default class MemoryConnector extends Connector {
         this.tables.set(table.path[0], data);
     }
 
-    override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+    override async deleteRow(table: AppTable, _?: string, key?: Record<string, unknown>) {
         if (!table.path[0] || !key) return;
 
         const data = this.tables.get(table.path[0]) ?? [];

@@ -3,13 +3,12 @@ import SchemaFX from '../src/index.js';
 import MemoryConnector from '../src/connectors/memoryConnector.js';
 import {
     AppFieldType,
-    type AppTable,
     Connector,
     ConnectorTableCapability,
     QueryFilterOperator,
     DataSourceType,
     type DataSourceDefinition,
-    ConnectorOptions
+    type ConnectorOptions
 } from '../src/types.js';
 
 type BenchmarkConnectorOptions = ConnectorOptions & {

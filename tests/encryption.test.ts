@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestApp } from './testUtils.js';
 import { encrypt, decrypt } from '../src/utils/encryption.js';
-import MemoryConnector from '../src/connectors/memoryConnector.js';
 import { AppFieldType, AppActionType } from '../src/types.js';
 
 describe('Encryption Utils', () => {

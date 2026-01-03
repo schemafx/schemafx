@@ -209,7 +209,7 @@ export default class DataService {
             rows: [connection]
         });
 
-        this.connectionsCache.delete(connectionId);
+        return this.connectionsCache.delete(connectionId);
     }
 
     async getSchema(appId: string) {
@@ -254,7 +254,7 @@ export default class DataService {
             rows: [schema]
         });
 
-        this.schemaCache.delete(appId);
+        return this.schemaCache.delete(appId);
     }
 
     private async _executeAction(

@@ -4,8 +4,7 @@ import SchemaFX from '../../src/index.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
 import {
     Connector,
-    AppSchema,
-    AppTable,
+    type AppTable,
     AppFieldType,
     AppActionType,
     QueryFilterOperator,

@@ -95,7 +95,7 @@ export default class FileConnector extends Connector {
         await writeFile(this.filePath, JSON.stringify(db, null, 4), 'utf-8');
     }
 
-    override async addRow(table: AppTable, auth?: string, row?: AppTableRow) {
+    override async addRow(table: AppTable, _?: string, row?: AppTableRow) {
         if (!table.path[0] || !row) return;
 
         const db = await this._readDB();
@@ -107,7 +107,7 @@ export default class FileConnector extends Connector {
 
     override async updateRow(
         table: AppTable,
-        auth?: string,
+        _?: string,
         key?: Record<string, unknown>,
         row?: AppTableRow
     ) {
@@ -125,7 +125,7 @@ export default class FileConnector extends Connector {
         await this._writeDB(db);
     }
 
-    override async deleteRow(table: AppTable, auth?: string, key?: Record<string, unknown>) {
+    override async deleteRow(table: AppTable, _?: string, key?: Record<string, unknown>) {
         if (!table.path[0] || !key) return;
 
         const db = await this._readDB();
