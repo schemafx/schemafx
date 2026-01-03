@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { AppSchemaSchema, ConnectorTableSchema } from '../types.js';
+import { AppSchemaSchema, AppViewType, ConnectorTableSchema } from '../types.js';
 import { validateTableKeys } from '../utils/schemaUtils.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
@@ -381,7 +381,17 @@ const plugin: FastifyPluginAsyncZod<{
                     id: randomUUID(),
                     name: 'New App',
                     tables: [table],
-                    views: []
+                    views: [
+                        {
+                            id: randomUUID(),
+                            name: table.name,
+                            tableId: table.id,
+                            type: AppViewType.Table,
+                            config: {
+                                fields: table.fields.map(f => f.id)
+                            }
+                        }
+                    ]
                 };
             }
 
