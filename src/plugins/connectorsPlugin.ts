@@ -35,6 +35,9 @@ const plugin: FastifyPluginAsyncZod<{
                                     .meta({ description: 'Connection details.' }),
                                 requiresConnection: z.boolean().default(false).meta({
                                     description: 'Whether the connector must be reconnected.'
+                                }),
+                                supportsData: z.boolean().default(false).meta({
+                                    description: 'Whether the connector supports getting data.'
                                 })
                             })
                         )
@@ -50,7 +53,8 @@ const plugin: FastifyPluginAsyncZod<{
                     const base = {
                         id: connector.id,
                         name: connector.name,
-                        requiresConnection: !!connector.authorize
+                        requiresConnection: !!connector.authorize,
+                        supportsData: !!connector.getData
                     };
 
                     return [
