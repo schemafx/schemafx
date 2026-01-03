@@ -719,5 +719,39 @@ describe('DuckDB Utils', () => {
             expect(result).toHaveLength(1);
             expect(result[0]).toHaveProperty('id', 2);
         });
+
+        it('should throw error when URL headers contain control characters in key', async () => {
+            await expect(
+                getData({
+                    source: {
+                        type: DataSourceType.Url,
+                        url: 'https://jsonplaceholder.typicode.com/users/1',
+                        options: {
+                            format: DataSourceFormat.Json,
+                            headers: {
+                                'X-Bad\x00Header': 'value'
+                            }
+                        }
+                    }
+                })
+            ).rejects.toThrow('header contains control characters');
+        });
+
+        it('should throw error when URL headers contain control characters in value', async () => {
+            await expect(
+                getData({
+                    source: {
+                        type: DataSourceType.Url,
+                        url: 'https://jsonplaceholder.typicode.com/users/1',
+                        options: {
+                            format: DataSourceFormat.Json,
+                            headers: {
+                                'X-Custom-Header': 'bad\x1Fvalue'
+                            }
+                        }
+                    }
+                })
+            ).rejects.toThrow('header contains control characters');
+        });
     });
 });

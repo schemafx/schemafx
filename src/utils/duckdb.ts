@@ -20,10 +20,18 @@ import {
     type TableQueryOptions,
     type DataSourceDefinition
 } from '../types.js';
+import {
+    hasControlChars,
+    validatePathOrUrl,
+    escapeSqlLiteral,
+    validateIdentifier
+} from './sqlSecurity.js';
 
 export { QueryFilterOperator };
 
 const qb = knex({ client: 'pg' });
+
+// Security helpers are provided by src/utils/sqlSecurity.ts
 
 /**
  * Recursively convert DuckDB types to plain JavaScript values.
@@ -160,8 +168,11 @@ export async function getData({
 
                 fs.writeFileSync(tempFilePath, JSON.stringify(source.data));
 
+                // Validate path and use parameterized literal to avoid injection
+                const safeTemp = validatePathOrUrl(tempFilePath, 'tempFilePath');
                 await connection.run(
-                    `CREATE TABLE ${quotedName} AS SELECT * FROM read_json_auto('${tempFilePath}')`
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}(?)`,
+                    [safeTemp]
                 );
 
                 break;
@@ -169,8 +180,11 @@ export async function getData({
 
             case DataSourceType.File: {
                 // For file sources, DuckDB can read directly from the file
+                // Validate file path and use parameterized argument
+                const safePath = validatePathOrUrl(source.path.replace(/\\/g, '/'), 'file path');
                 await connection.run(
-                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}('${source.path.replace(/\\/g, '/')}')`
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}(?)`,
+                    [safePath]
                 );
 
                 break;
@@ -180,19 +194,23 @@ export async function getData({
                 // Create HTTP secret with headers if provided
                 const headers = source.options?.headers;
                 if (headers && Object.keys(headers).length > 0) {
-                    await connection.run(`
-                        CREATE SECRET http_auth (
-                            TYPE HTTP,
-                            EXTRA_HTTP_HEADERS MAP {${Object.entries(headers)
-                                .map(([k, v]) => `'${k}': '${v}'`)
-                                .join(', ')}}
-                        );
-                    `);
+                    // Validate header keys/values (no control chars) and escape single quotes
+                    const entries = Object.entries(headers).map(([k, v]) => {
+                        if (hasControlChars(k) || hasControlChars(String(v)))
+                            throw new Error('header contains control characters');
+                        return `'${escapeSqlLiteral(k)}': '${escapeSqlLiteral(String(v))}'`;
+                    });
+
+                    await connection.run(
+                        `CREATE SECRET http_auth (TYPE HTTP, EXTRA_HTTP_HEADERS MAP {${entries.join(', ')}});`
+                    );
                 }
 
-                // DuckDB can fetch directly from HTTP/HTTPS URLs
+                // Validate URL and use parameterized argument
+                const safeUrl = validatePathOrUrl(source.url, 'url');
                 await connection.run(
-                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}('${source.url}')`
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}(?)`,
+                    [safeUrl]
                 );
 
                 break;
@@ -208,8 +226,10 @@ export async function getData({
                 // Use pipeline to efficiently stream data to file
                 await pipeline(source.stream, fs.createWriteStream(tempFilePath));
 
+                const safeTempStream = validatePathOrUrl(tempFilePath, 'tempFilePath');
                 await connection.run(
-                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}('${tempFilePath}')`
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${getReadFunction(source.options?.format)}(?)`,
+                    [safeTempStream]
                 );
 
                 break;
@@ -218,17 +238,27 @@ export async function getData({
             case DataSourceType.Connection: {
                 // Install and load the specified DuckDB extension dynamically
                 const { module, connectionString, target } = source;
-                const connStr = connectionString.replace(/\\/g, '/');
+                const connStr = validatePathOrUrl(
+                    connectionString.replace(/\\/g, '/'),
+                    'connectionString'
+                );
                 const attachName = `db_${Math.random().toString(36).substring(7)}`;
-                const moduleUpper = module.toUpperCase();
+                const moduleUpper = validateIdentifier(module).toUpperCase();
 
-                await connection.run(`INSTALL ${module}; LOAD ${module};`);
+                // Install and load are module identifiers - validate before embedding
+                await connection.run(`INSTALL ${moduleUpper}; LOAD ${moduleUpper};`);
+
+                // DuckDB ATTACH doesn't accept parameter placeholders in some versions;
+                // embed an escaped, validated connection string literal instead.
+                const escapedConn = escapeSqlLiteral(connStr);
                 await connection.run(
-                    `ATTACH '${connStr}' AS ${attachName} (TYPE ${moduleUpper}, READ_ONLY)`
+                    `ATTACH '${escapedConn}' AS ${attachName} (TYPE ${moduleUpper}, READ_ONLY)`
                 );
 
+                // Validate target identifier before using as a qualified name
+                const safeTarget = validateIdentifier(target);
                 await connection.run(
-                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${attachName}.${target}`
+                    `CREATE TABLE ${quotedName} AS SELECT * FROM ${attachName}.${safeTarget}`
                 );
 
                 break;
