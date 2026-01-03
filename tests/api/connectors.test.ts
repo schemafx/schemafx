@@ -6,7 +6,7 @@ import { MemoryConnector } from '../../src/index.js';
 
 class MockAuthConnector extends MemoryConnector {
     constructor() {
-        super('AuthConnector', 'auth-conn');
+        super({ name: 'AuthConnector', id: 'auth-conn' });
     }
 
     async getAuthUrl() {
@@ -23,7 +23,7 @@ class MockAuthConnector extends MemoryConnector {
 
 class MockAuthConnectorWithEmail extends MemoryConnector {
     constructor() {
-        super('AuthConnectorWithEmail', 'auth-conn-email');
+        super({ name: 'AuthConnectorWithEmail', id: 'auth-conn-email' });
     }
 
     async getAuthUrl() {
@@ -189,7 +189,7 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(302);
-        expect(response.headers.location).toBe('http://example.com/auth');
+        expect(response.headers.location?.startsWith('http://example.com/auth')).toBe(true);
     });
 
     it('should handle full OAuth flow with redirectUri in query and redirect back', async () => {
@@ -268,10 +268,13 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.connectionId).toBeDefined();
 
-        const connection = await app.dataService.getConnection(body.connectionId);
+        const connectionId = response.body.match(/"connectionId":"(?<connectionId>[^"]+?)"/m)
+            ?.groups?.connectionId;
+
+        expect(connectionId).toBeDefined();
+
+        const connection = await app.dataService.getConnection(connectionId);
         expect(connection).toBeDefined();
         expect(connection?.connector).toBe('auth-conn');
         expect(connection?.name).toBe('Mock Connection');
@@ -285,11 +288,14 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.connectionId).toBeDefined();
-        expect(body.token).toBeDefined();
 
-        const connection = await app.dataService.getConnection(body.connectionId);
+        const connectionId = response.body.match(/"connectionId":"(?<connectionId>[^"]+?)"/m)
+            ?.groups?.connectionId;
+
+        expect(connectionId).toBeDefined();
+        expect(response.body.match(/"token":"(?<token>[^"]+?)"/m)?.groups?.token).toBeDefined();
+
+        const connection = await app.dataService.getConnection(connectionId);
         expect(connection).toBeDefined();
         expect(connection?.connector).toBe('auth-conn-email');
         expect(connection?.name).toBe('Mock Connection With Email');

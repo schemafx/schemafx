@@ -309,13 +309,18 @@ export const ConnectorTableSchema = z.object({
 
 export type ConnectorTable = z.infer<typeof ConnectorTableSchema>;
 
+export type ConnectorOptions = {
+    name: string;
+    id?: string;
+};
+
 export abstract class Connector {
     name: string;
     id: string;
 
-    constructor(name: string, id?: string) {
-        this.name = name;
-        this.id = id ?? name;
+    constructor(opts: ConnectorOptions) {
+        this.name = opts.name;
+        this.id = opts.id ?? opts.name;
     }
 
     /**

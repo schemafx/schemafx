@@ -12,7 +12,7 @@ export default class AuthConnector extends Connector {
     devEmail: string;
 
     constructor(options: AuthConnectorOptions) {
-        super(options.name, options.id);
+        super(options);
 
         this.serverUri = options.serverUri;
         this.devEmail = options.devEmail || 'dev@schemafx.com';

@@ -6,7 +6,7 @@ import { MemoryConnector } from '../../src/index.js';
 
 class MockAuthConnectorWithEmail extends MemoryConnector {
     constructor() {
-        super('AuthConnectorWithEmail', 'auth-login');
+        super({ name: 'AuthConnectorWithEmail', id: 'auth-login' });
     }
 
     async authorize(params: any) {
@@ -20,7 +20,7 @@ class MockAuthConnectorWithEmail extends MemoryConnector {
 
 class MockAuthConnectorWithoutEmail extends MemoryConnector {
     constructor() {
-        super('AuthConnectorWithoutEmail', 'auth-no-email');
+        super({ name: 'AuthConnectorWithoutEmail', id: 'auth-no-email' });
     }
 
     async authorize(params: any) {

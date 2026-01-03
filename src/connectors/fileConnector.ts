@@ -6,7 +6,8 @@ import {
     type AppTableRow,
     type AppTable,
     type DataSourceDefinition,
-    ConnectorTableCapability
+    ConnectorTableCapability,
+    type ConnectorOptions
 } from '../types.js';
 import { inferTable } from '../utils/dataUtils.js';
 
@@ -15,12 +16,16 @@ type FileDB = {
     tables: Record<string, AppTableRow[]>;
 };
 
+export type FileConnectorOptions = ConnectorOptions & {
+    filePath: string;
+};
+
 export default class FileConnector extends Connector {
     filePath: string;
 
-    constructor(name: string, filePath: string, id?: string) {
-        super(name, id);
-        this.filePath = filePath;
+    constructor(opts: FileConnectorOptions) {
+        super(opts);
+        this.filePath = opts.filePath;
     }
 
     async listTables(path: string[]) {

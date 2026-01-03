@@ -29,7 +29,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -49,7 +49,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             corsOpts: { origin: false },
             rateLimitOpts: { max: 50 },
@@ -82,7 +82,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             rateLimitOpts: { max: 2, timeWindow: '10 minutes' }
         });
@@ -131,7 +131,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             corsOpts: { origin: false },
             rateLimitOpts: { max: 50 },
@@ -176,7 +176,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -200,7 +200,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -221,7 +221,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -242,7 +242,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -269,7 +269,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -306,7 +306,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
@@ -417,7 +417,7 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
-                connectors: [new MemoryConnector('Mem', 'mem')]
+                connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
         const server = app.fastifyInstance;
@@ -430,7 +430,7 @@ describe('Core SchemaFX', () => {
 
         await server.ready();
 
-        const token = app.fastifyInstance.jwt.sign({ id: 'test' });
+        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
 
         const response = await server.inject({
             method: 'GET',

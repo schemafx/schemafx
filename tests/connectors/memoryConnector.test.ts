@@ -12,7 +12,7 @@ describe('MemoryConnector', () => {
     const connectorId = 'mem';
 
     beforeEach(() => {
-        connector = new MemoryConnector('Memory', connectorId);
+        connector = new MemoryConnector({ name: 'Memory', id: connectorId });
     });
 
     it('should initialize correctly', () => {
@@ -23,7 +23,7 @@ describe('MemoryConnector', () => {
     });
 
     it('should generate id if not provided', () => {
-        const conn = new MemoryConnector('Test');
+        const conn = new MemoryConnector({ name: 'Test' });
         expect(conn.id).toBeDefined();
         expect(conn.id.length).toBeGreaterThan(0);
     });

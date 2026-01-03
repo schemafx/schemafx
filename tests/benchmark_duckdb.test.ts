@@ -8,15 +8,20 @@ import {
     ConnectorTableCapability,
     QueryFilterOperator,
     DataSourceType,
-    type DataSourceDefinition
+    type DataSourceDefinition,
+    ConnectorOptions
 } from '../src/types.js';
+
+type BenchmarkConnectorOptions = ConnectorOptions & {
+    rowCount: number;
+};
 
 class BenchmarkConnector extends Connector {
     rowCount: number;
 
-    constructor(name: string, rowCount: number = 100000, id?: string) {
-        super(name, id);
-        this.rowCount = rowCount;
+    constructor(opts: BenchmarkConnectorOptions) {
+        super(opts);
+        this.rowCount = opts.rowCount ?? 10000;
     }
 
     async listTables() {
@@ -44,7 +49,7 @@ class BenchmarkConnector extends Connector {
         };
     }
 
-    async getData() {
+    async getData(): Promise<DataSourceDefinition> {
         const rows = [];
         for (let i = 0; i < this.rowCount; i++) {
             rows.push({
@@ -67,8 +72,8 @@ describe('DuckDB Integration Benchmark', () => {
     let token: string;
 
     beforeAll(async () => {
-        const memConnector = new MemoryConnector('memory');
-        const benchConnector = new BenchmarkConnector('bench', 100_000);
+        const memConnector = new MemoryConnector({ name: 'memory' });
+        const benchConnector = new BenchmarkConnector({ name: 'bench', rowCount: 100_000 });
 
         app = new SchemaFX({
             jwtOpts: { secret: 'supersecret' },
@@ -86,7 +91,7 @@ describe('DuckDB Integration Benchmark', () => {
         });
 
         await app.fastifyInstance.ready();
-        token = app.fastifyInstance.jwt.sign({ id: 'user1' });
+        token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
 
         await app.dataService.setSchema({
             id: schemaId,

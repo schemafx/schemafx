@@ -15,7 +15,7 @@ describe('DataService', () => {
     let options: DataServiceOptions;
 
     beforeEach(() => {
-        connector = new MemoryConnector('mem', 'mem');
+        connector = new MemoryConnector({ name: 'mem' });
         options = {
             schemaConnector: {
                 connector: connector.id,
@@ -380,7 +380,7 @@ describe('DataService', () => {
                 async getTable() {
                     return undefined;
                 }
-            })('minimal');
+            })({ name: 'minimal' });
 
             const minimalOptions: DataServiceOptions = {
                 schemaConnector: {

@@ -9,10 +9,10 @@ import path from 'path';
 import AuthConnector from './connectors/authConnector.js';
 
 const port = 3000;
-const dbPath = path.join(process.cwd(), 'dev/database.json');
+const filePath = path.join(process.cwd(), 'dev/database.json');
 
-const memoryConnector = new MemoryConnector('Memory', 'memory');
-const fileConnector = new FileConnector('File System', dbPath, 'file');
+const memoryConnector = new MemoryConnector({ name: 'Memory', id: 'memory' });
+const fileConnector = new FileConnector({ name: 'File System', id: 'file', filePath });
 const defaultConnector = fileConnector.id;
 const app = new SchemaFX({
     jwtOpts: {
