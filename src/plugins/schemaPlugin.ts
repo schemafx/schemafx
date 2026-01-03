@@ -30,15 +30,12 @@ const plugin: FastifyPluginAsyncZod<{
         },
         async (request, reply) => {
             const schema = await dataService.getSchema(request.params.appId);
+            if (schema) return schema;
 
-            if (!schema) {
-                return reply.code(404).send({
-                    error: 'Not Found',
-                    message: 'Application not found.'
-                });
-            }
-
-            return schema;
+            return reply.code(404).send({
+                error: 'Not Found',
+                message: 'Application not found.'
+            });
         }
     );
 
