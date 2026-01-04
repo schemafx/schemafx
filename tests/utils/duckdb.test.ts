@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { getData, QueryFilterOperator } from '../../src/utils/duckdb';
-import { DataSourceType, DataSourceFormat } from '../../src/types';
+import { getData, QueryFilterOperator } from '../../src/utils/duckdb.js';
+import { DataSourceType, DataSourceFormat } from '../../src/types.js';
 
 describe('DuckDB Utils', () => {
     const testData = [
@@ -28,7 +28,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].id).toBe(uuid);
+            expect(result[0]?.id).toBe(uuid);
         });
 
         it('should handle data with undefined values in nested objects', async () => {
@@ -87,9 +87,9 @@ describe('DuckDB Utils', () => {
                 query: { orderBy: { column: 'age', direction: 'asc' } }
             });
 
-            expect(result[0].name).toBe('Bob');
-            expect(result[1].name).toBe('Alice');
-            expect(result[2].name).toBe('Charlie');
+            expect(result[0]?.name).toBe('Bob');
+            expect(result[1]?.name).toBe('Alice');
+            expect(result[2]?.name).toBe('Charlie');
         });
 
         it('should apply orderBy descending', async () => {
@@ -98,9 +98,9 @@ describe('DuckDB Utils', () => {
                 query: { orderBy: { column: 'age', direction: 'desc' } }
             });
 
-            expect(result[0].name).toBe('Charlie');
-            expect(result[1].name).toBe('Alice');
-            expect(result[2].name).toBe('Bob');
+            expect(result[0]?.name).toBe('Charlie');
+            expect(result[1]?.name).toBe('Alice');
+            expect(result[2]?.name).toBe('Bob');
         });
 
         it('should apply equals filter', async () => {
@@ -114,7 +114,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].name).toBe('Alice');
+            expect(result[0]?.name).toBe('Alice');
         });
 
         it('should apply notEqual filter', async () => {
@@ -142,7 +142,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].name).toBe('Charlie');
+            expect(result[0]?.name).toBe('Charlie');
         });
 
         it('should apply greaterThanOrEqualTo filter', async () => {
@@ -171,7 +171,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].name).toBe('Bob');
+            expect(result[0]?.name).toBe('Bob');
         });
 
         it('should apply lowerThanOrEqualTo filter', async () => {
@@ -242,8 +242,8 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(2);
-            expect(result[0].name).toBe('Alice');
-            expect(result[1].name).toBe('Bob');
+            expect(result[0]?.name).toBe('Alice');
+            expect(result[1]?.name).toBe('Bob');
         });
 
         it('should handle Number dates (returns as number)', async () => {
@@ -256,8 +256,8 @@ describe('DuckDB Utils', () => {
                 source: { type: DataSourceType.Inline, data }
             });
 
-            expect(result[0].created).toBe(1704067200000);
-            expect(result[1].created).toBe(1704153600000);
+            expect(result[0]?.created).toBe(1704067200000);
+            expect(result[1]?.created).toBe(1704153600000);
         });
 
         it('should handle Text dates (returns as ISO string)', async () => {
@@ -270,8 +270,8 @@ describe('DuckDB Utils', () => {
                 source: { type: DataSourceType.Inline, data }
             });
 
-            expect(result[0].created).toBe('2024-01-01T00:00:00.000Z');
-            expect(result[1].created).toBe('2024-01-02T00:00:00.000Z');
+            expect(result[0]?.created).toBe('2024-01-01T00:00:00.000Z');
+            expect(result[1]?.created).toBe('2024-01-02T00:00:00.000Z');
         });
 
         it('should handle various field types', async () => {
@@ -291,12 +291,12 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].id).toBe(1);
-            expect(result[0].name).toBe('Test');
-            expect(result[0].age).toBe(30);
-            expect(result[0].active).toBe(true);
-            expect(result[0].score).toBe(95.5);
-            expect(result[0].created).toBe('2024-01-01T00:00:00.000Z');
+            expect(result[0]?.id).toBe(1);
+            expect(result[0]?.name).toBe('Test');
+            expect(result[0]?.age).toBe(30);
+            expect(result[0]?.active).toBe(true);
+            expect(result[0]?.score).toBe(95.5);
+            expect(result[0]?.created).toBe('2024-01-01T00:00:00.000Z');
         });
 
         it('should handle decodeRow option', async () => {
@@ -314,8 +314,8 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(2);
-            expect(result[0].name).toBe('Alice');
-            expect(result[1].name).toBe('Bob');
+            expect(result[0]?.name).toBe('Alice');
+            expect(result[1]?.name).toBe('Bob');
         });
 
         it('should handle struct field types', async () => {
@@ -335,8 +335,8 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(2);
-            expect(result[0].metadata).toEqual({ key: 'value', nested: { a: 1 } });
-            expect(result[1].metadata).toEqual({ key: 'other', nested: { a: 2 } });
+            expect(result[0]?.metadata).toEqual({ key: 'value', nested: { a: 1 } });
+            expect(result[1]?.metadata).toEqual({ key: 'other', nested: { a: 2 } });
         });
 
         it('should handle list field types', async () => {
@@ -350,8 +350,8 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(2);
-            expect(result[0].tags).toEqual(['a', 'b', 'c']);
-            expect(result[1].tags).toEqual(['d', 'e']);
+            expect(result[0]?.tags).toEqual(['a', 'b', 'c']);
+            expect(result[1]?.tags).toEqual(['d', 'e']);
         });
 
         it('should handle Date inside struct (returns as ISO string)', async () => {
@@ -367,7 +367,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].info).toEqual({
+            expect(result[0]?.info).toEqual({
                 name: 'Test',
                 created: '2024-01-01T00:00:00.000Z'
             });
@@ -386,7 +386,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].dates).toEqual([
+            expect(result[0]?.dates).toEqual([
                 '2024-01-01T00:00:00.000Z',
                 '2024-01-02T00:00:00.000Z'
             ]);
@@ -403,7 +403,7 @@ describe('DuckDB Utils', () => {
 
             expect(result).toHaveLength(1);
             // DuckDB will parse and return this - the important thing is it doesn't crash
-            expect(result[0].bigValue).toBeDefined();
+            expect(result[0]?.bigValue).toBeDefined();
         });
 
         it('should handle plain arrays in data', async () => {
@@ -414,7 +414,7 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(1);
-            expect(result[0].values).toEqual([1, 2, 3]);
+            expect(result[0]?.values).toEqual([1, 2, 3]);
         });
 
         it('should handle null values in data', async () => {
@@ -428,8 +428,8 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(2);
-            expect(result[0].optional).toBe(null);
-            expect(result[1].optional).toBe('value');
+            expect(result[0]?.optional).toBe(null);
+            expect(result[1]?.optional).toBe('value');
         });
 
         it('should handle Connection data source with SQLite and target table', async () => {
@@ -462,8 +462,8 @@ describe('DuckDB Utils', () => {
                 });
 
                 expect(result).toHaveLength(2);
-                expect(result[0].name).toBe('Alice');
-                expect(result[1].name).toBe('Bob');
+                expect(result[0]?.name).toBe('Alice');
+                expect(result[1]?.name).toBe('Bob');
             } finally {
                 try {
                     fs.unlinkSync(tempPath);
@@ -537,8 +537,8 @@ describe('DuckDB Utils', () => {
             });
 
             expect(result).toHaveLength(2);
-            expect(result[0].name).toBe('Alice');
-            expect(result[1].name).toBe('Bob');
+            expect(result[0]?.name).toBe('Alice');
+            expect(result[1]?.name).toBe('Bob');
         });
 
         it('should handle File data source with CSV format', async () => {
@@ -559,7 +559,7 @@ describe('DuckDB Utils', () => {
                 });
 
                 expect(result).toHaveLength(2);
-                expect(result[0].name).toBe('Alice');
+                expect(result[0]?.name).toBe('Alice');
             } finally {
                 fs.unlinkSync(tempPath);
             }
@@ -590,7 +590,7 @@ describe('DuckDB Utils', () => {
                 });
 
                 expect(result).toHaveLength(2);
-                expect(result[0].name).toBe('Alice');
+                expect(result[0]?.name).toBe('Alice');
             } finally {
                 fs.unlinkSync(tempPath);
             }
@@ -622,7 +622,7 @@ describe('DuckDB Utils', () => {
                 });
 
                 expect(result).toHaveLength(2);
-                expect(result[0].name).toBe('Alice');
+                expect(result[0]?.name).toBe('Alice');
             } finally {
                 fs.unlinkSync(tempPath);
             }
@@ -646,7 +646,7 @@ describe('DuckDB Utils', () => {
                 });
 
                 expect(result).toHaveLength(2);
-                expect(result[0].name).toBe('Alice');
+                expect(result[0]?.name).toBe('Alice');
             } finally {
                 fs.unlinkSync(tempPath);
             }
@@ -678,7 +678,7 @@ describe('DuckDB Utils', () => {
                 });
 
                 expect(result).toHaveLength(2);
-                expect(result[0].name).toBe('Alice');
+                expect(result[0]?.name).toBe('Alice');
             } finally {
                 if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
             }

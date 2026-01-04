@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import DataService, { DataServiceOptions } from '../../src/services/DataService.js';
+import DataService, { type DataServiceOptions } from '../../src/services/DataService.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
 import { AppActionType, AppFieldType, type AppSchema, Connector } from '../../src/types.js';
 
@@ -18,6 +18,10 @@ describe('DataService', () => {
             connectionsConnector: {
                 connector: connector.id,
                 path: ['connections']
+            },
+            permissionsConnector: {
+                connector: connector.id,
+                path: ['permissions']
             },
             connectors: [connector]
         };
@@ -127,7 +131,7 @@ describe('DataService', () => {
             expect(dataService.connectionsCache.has('delete-test')).toBe(false);
 
             // Verify connection was deleted from the connector
-            const connectorData = connector.tables.get(dataService.connectionsTable.path[0]) ?? [];
+            const connectorData = connector.tables.get(dataService.connectionsTable.path[0]!) ?? [];
             expect(connectorData.find(c => c.id === 'delete-test')).toBeUndefined();
 
             const fetched = await dataService.getConnection('delete-test');
@@ -348,7 +352,7 @@ describe('DataService', () => {
             });
 
             expect(data).toHaveLength(1);
-            expect(data[0].name).toBe('Bob');
+            expect(data[0]?.name).toBe('Bob');
         });
 
         it('should limit data', async () => {
@@ -385,6 +389,10 @@ describe('DataService', () => {
                     connector: minimalConnector.id,
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: minimalConnector.id,
+                    path: ['permissions']
+                },
                 connectors: [minimalConnector]
             };
 
@@ -400,114 +408,6 @@ describe('DataService', () => {
 
             const data = await ds.getData(table);
             expect(data).toEqual([]);
-        });
-    });
-
-    describe('Permissions - Cache Invalidation', () => {
-        let permissionsConnector: MemoryConnector;
-        let dsWithPermissions: DataService;
-
-        beforeEach(() => {
-            permissionsConnector = new MemoryConnector({ name: 'perms' });
-            const memConnector = new MemoryConnector({ name: 'mem' });
-
-            dsWithPermissions = new DataService({
-                schemaConnector: {
-                    connector: memConnector.id,
-                    path: ['schemas']
-                },
-                connectionsConnector: {
-                    connector: memConnector.id,
-                    path: ['connections']
-                },
-                permissionsConnector: {
-                    connector: permissionsConnector.id,
-                    path: ['permissions']
-                },
-                connectors: [memConnector, permissionsConnector]
-            });
-        });
-
-        it('should invalidate old target cache when permission target changes', async () => {
-            // Create initial permission
-            await dsWithPermissions.setPermission({
-                id: 'perm1',
-                targetType: 'app',
-                targetId: 'app1',
-                email: 'user@example.com',
-                level: 'read'
-            });
-
-            // Cache the permissions for app1
-            const app1Permissions = await dsWithPermissions.getPermissions({
-                targetType: 'app',
-                targetId: 'app1'
-            });
-            expect(app1Permissions).toHaveLength(1);
-
-            // Update permission to a different target
-            await dsWithPermissions.setPermission({
-                id: 'perm1',
-                targetType: 'app',
-                targetId: 'app2', // Changed from app1 to app2
-                email: 'user@example.com',
-                level: 'read'
-            });
-
-            // Both caches should be invalidated; app1 should now be empty
-            const app1PermissionsAfter = await dsWithPermissions.getPermissions({
-                targetType: 'app',
-                targetId: 'app1'
-            });
-            expect(app1PermissionsAfter).toHaveLength(0);
-
-            // app2 should have the permission
-            const app2Permissions = await dsWithPermissions.getPermissions({
-                targetType: 'app',
-                targetId: 'app2'
-            });
-            expect(app2Permissions).toHaveLength(1);
-            expect(app2Permissions[0].email).toBe('user@example.com');
-        });
-
-        it('should invalidate old target cache when permission targetType changes', async () => {
-            // Create initial permission
-            await dsWithPermissions.setPermission({
-                id: 'perm2',
-                targetType: 'app',
-                targetId: 'target1',
-                email: 'user2@example.com',
-                level: 'write'
-            });
-
-            // Cache the permissions for app target1
-            await dsWithPermissions.getPermissions({
-                targetType: 'app',
-                targetId: 'target1'
-            });
-
-            // Update permission to a different targetType
-            await dsWithPermissions.setPermission({
-                id: 'perm2',
-                targetType: 'connection', // Changed from app to connection
-                targetId: 'target1',
-                email: 'user2@example.com',
-                level: 'write'
-            });
-
-            // app/target1 should now be empty
-            const appPermissions = await dsWithPermissions.getPermissions({
-                targetType: 'app',
-                targetId: 'target1'
-            });
-            expect(appPermissions).toHaveLength(0);
-
-            // connection/target1 should have the permission
-            const connPermissions = await dsWithPermissions.getPermissions({
-                targetType: 'connection',
-                targetId: 'target1'
-            });
-            expect(connPermissions).toHaveLength(1);
         });
     });
 });

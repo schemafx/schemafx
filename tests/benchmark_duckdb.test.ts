@@ -50,7 +50,7 @@ class BenchmarkConnector extends Connector {
         };
     }
 
-    async getData(): Promise<DataSourceDefinition> {
+    override async getData(): Promise<DataSourceDefinition> {
         const rows = [];
         for (let i = 0; i < this.rowCount; i++) {
             rows.push({

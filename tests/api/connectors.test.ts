@@ -9,11 +9,11 @@ class MockAuthConnector extends MemoryConnector {
         super({ name: 'AuthConnector', id: 'auth-conn' });
     }
 
-    async getAuthUrl() {
+    override async getAuthUrl() {
         return 'http://example.com/auth';
     }
 
-    async authorize(params: any) {
+    override async authorize(params: any) {
         return {
             name: 'Mock Connection',
             content: JSON.stringify({ token: 'mock-token', ...params })
@@ -26,11 +26,11 @@ class MockAuthConnectorWithEmail extends MemoryConnector {
         super({ name: 'AuthConnectorWithEmail', id: 'auth-conn-email' });
     }
 
-    async getAuthUrl() {
+    override async getAuthUrl() {
         return 'http://example.com/auth/email';
     }
 
-    async authorize(params: any) {
+    override async authorize(params: any) {
         return {
             name: 'Mock Connection With Email',
             content: JSON.stringify({ token: 'mock-token', ...params }),
@@ -48,7 +48,7 @@ describe('Connectors API', () => {
         const testApp = await createTestApp(true);
         app = testApp.app;
         server = app.fastifyInstance;
-        token = testApp.token;
+        token = testApp.token!;
 
         // Add mock auth connector
         app.dataService.connectors['auth-conn'] = new MockAuthConnector();

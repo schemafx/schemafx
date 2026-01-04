@@ -21,7 +21,7 @@ describe('Schema Operations', () => {
         app = testApp.app;
         server = app.fastifyInstance;
         connector = testApp.connector;
-        token = testApp.token;
+        token = testApp.token!;
     });
 
     afterEach(async () => {
@@ -377,11 +377,11 @@ describe('Schema Operations', () => {
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
         const table = body.tables.find((t: any) => t.id === 'users');
-        expect(table?.fields[0].id).toBe('name');
-        expect(table?.fields[1].id).toBe('id');
+        expect(table?.fields[0]?.id).toBe('name');
+        expect(table?.fields[1]?.id).toBe('id');
         // Verify other table's fields were not reordered
         const productsTable = body.tables.find((t: any) => t.id === 'products');
-        expect(productsTable?.fields[0].id).toBe('id');
+        expect(productsTable?.fields[0]?.id).toBe('id');
     });
 
     it('should return 404 for unknown app schema', async () => {
@@ -659,6 +659,7 @@ describe('Schema Operations', () => {
         // Create another table to reorder
         const schema = await app.dataService.getSchema('app1');
         if (!schema) throw new Error('Schema not found');
+        if (!schema.tables[0]) throw new Error('No defined table');
         schema.tables.push({ ...schema.tables[0], id: 'users2', name: 'Users 2' });
         await app.dataService.setSchema(schema);
 
@@ -923,8 +924,8 @@ describe('Schema Operations', () => {
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
-        expect(body.views[0].id).toBe('view2');
-        expect(body.views[1].id).toBe('view1');
+        expect(body.views[0]?.id).toBe('view2');
+        expect(body.views[1]?.id).toBe('view1');
     });
 
     it('should reject updating table without key fields', async () => {
@@ -1002,7 +1003,6 @@ describe('Schema Operations', () => {
 
         // Add a "ghost" table reference - add the table, set schema, then test
         // First remove all tables to create the edge case
-        const originalTables = [...schema.tables];
         schema.tables = []; // Empty tables array
 
         // Add view that would match if we add field to 'ghost' table

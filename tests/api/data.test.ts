@@ -31,7 +31,7 @@ class LimitedConnector extends Connector {
         return [];
     }
 
-    async getTable(path: string[]): Promise<AppTable> {
+    async getTable(): Promise<AppTable> {
         return {
             id: 't1',
             name: 'T1',
@@ -49,12 +49,12 @@ class LimitedConnector extends Connector {
         };
     }
 
-    async getCapabilities() {
+    override async getCapabilities() {
         // Return NO capabilities (no filter, no limit, no offset)
         return {};
     }
 
-    async getData(): Promise<DataSourceDefinition> {
+    override async getData(): Promise<DataSourceDefinition> {
         return {
             type: DataSourceType.Inline,
             data: [...this.data]
@@ -73,7 +73,7 @@ describe('Data API', () => {
         app = testApp.app;
         connector = testApp.connector;
         server = app.fastifyInstance;
-        token = testApp.token;
+        token = testApp.token!;
     });
 
     afterEach(async () => {
@@ -593,7 +593,7 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
 
         const response = await server.inject({
             method: 'GET',
-            url: `/api/apps/${schema.id}/data/${schema.tables[0].id}?query=${encodeURIComponent(
+            url: `/api/apps/${schema.id}/data/${schema.tables[0]?.id}?query=${encodeURIComponent(
                 JSON.stringify({
                     filters: [
                         { field: 'age', operator: QueryFilterOperator.GreaterThan, value: 28 }
@@ -610,7 +610,7 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
 
         const response2 = await server.inject({
             method: 'GET',
-            url: `/api/apps/${schema.id}/data/${schema.tables[0].id}?query=${encodeURIComponent(
+            url: `/api/apps/${schema.id}/data/${schema.tables[0]?.id}?query=${encodeURIComponent(
                 JSON.stringify({
                     filters: [
                         { field: 'age', operator: QueryFilterOperator.GreaterThan, value: 20 }

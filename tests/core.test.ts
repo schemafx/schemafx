@@ -11,8 +11,8 @@ declare module 'fastify' {
 
 declare module '@fastify/jwt' {
     interface FastifyJWT {
-        payload: { id: string };
-        user: { id: string };
+        payload: { email: string };
+        user: { email: string };
     }
 }
 
@@ -28,6 +28,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -48,6 +52,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
@@ -81,6 +89,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
@@ -131,6 +143,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             corsOpts: { origin: false },
@@ -176,6 +192,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -200,6 +220,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -221,6 +245,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -241,6 +269,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -268,6 +300,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -305,6 +341,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -417,6 +457,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -430,7 +474,7 @@ describe('Core SchemaFX', () => {
 
         await server.ready();
 
-        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
+        const token = app.fastifyInstance.jwt.sign({ email: 'dev@schemafx.com' });
 
         const response = await server.inject({
             method: 'GET',

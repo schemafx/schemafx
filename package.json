@@ -16,7 +16,7 @@
         "url": "https://github.com/schemafx/schemafx.git"
     },
     "scripts": {
-        "build": "npm run build:clean && tsc -b --clean && tsc -b",
+        "build": "npm run build:clean && tsc -b --clean tsconfig.build.json && tsc -b tsconfig.build.json",
         "build:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true })\"",
         "start": "node .",
         "dev": "tsx watch dev/dev.ts --watch ./src --watch ./dev",

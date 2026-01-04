@@ -4,7 +4,8 @@ import SchemaFX, {
     type AppSchema,
     MemoryConnector,
     PermissionTargetType,
-    PermissionLevel
+    PermissionLevel,
+    type AppTable
 } from '../src/index.js';
 
 export const TEST_USER_EMAIL = 'test@example.com';
@@ -67,7 +68,7 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
 
     await app.dataService.setSchema(schema);
     await app.dataService.executeAction({
-        table: schema.tables[0],
+        table: schema.tables[0] as AppTable,
         actId: 'add',
         rows: [{ id: 1, name: 'User 1' }]
     });

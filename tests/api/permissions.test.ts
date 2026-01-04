@@ -12,7 +12,7 @@ class MockAuthConnector extends MemoryConnector {
         this.userEmail = email;
     }
 
-    async authorize() {
+    override async authorize() {
         return {
             name: 'Mock Connection',
             content: JSON.stringify({ token: 'mock-token' }),
@@ -294,7 +294,6 @@ describe('Permissions Management API', () => {
 describe('Data Endpoints with Permissions', () => {
     let app: SchemaFX;
     let server: FastifyInstance;
-    let adminToken: string;
     let userToken: string;
 
     beforeEach(async () => {
@@ -310,20 +309,13 @@ describe('Data Endpoints with Permissions', () => {
 
         await server.ready();
 
-        // Get admin token
-        const adminResponse = await server.inject({
-            method: 'POST',
-            url: '/api/login/auth-admin',
-            payload: {}
-        });
-        adminToken = JSON.parse(adminResponse.payload).token;
-
         // Get user token
         const userResponse = await server.inject({
             method: 'POST',
             url: '/api/login/auth-user',
             payload: {}
         });
+
         userToken = JSON.parse(userResponse.payload).token;
     });
 

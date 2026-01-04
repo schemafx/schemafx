@@ -1,4 +1,4 @@
-import { Connector } from '../../src/index';
+import { Connector } from '../../src/index.js';
 
 export type AuthConnectorOptions = {
     name: string;
