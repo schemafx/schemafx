@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestApp } from '../testUtils.js';
+import { createTestApp, TEST_USER_EMAIL } from '../testUtils.js';
 import SchemaFX from '../../src/index.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
 import {
@@ -9,7 +9,9 @@ import {
     AppActionType,
     QueryFilterOperator,
     DataSourceType,
-    type DataSourceDefinition
+    type DataSourceDefinition,
+    PermissionTargetType,
+    PermissionLevel
 } from '../../src/types.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -91,7 +93,7 @@ describe('Data API', () => {
         expect(body[0].id).toBe(1);
     });
 
-    it('should 404 for unknown application', async () => {
+    it('should 403 for unknown application (no permission)', async () => {
         const response = await server.inject({
             method: 'POST',
             url: '/api/apps/app2/data/users',
@@ -102,7 +104,7 @@ describe('Data API', () => {
             }
         });
 
-        expect(response.statusCode).toBe(404);
+        expect(response.statusCode).toBe(403);
     });
 
     it('should filter data', async () => {
@@ -198,7 +200,7 @@ describe('Data API', () => {
     });
 
     it('should handle recursive relationship max depth', async () => {
-        await app.dataService.setSchema({
+        const treeSchema = {
             id: 'tree',
             name: 'Tree',
             tables: [
@@ -225,6 +227,14 @@ describe('Data API', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(treeSchema);
+        await app.dataService.setPermission({
+            id: 'tree-permission',
+            targetType: PermissionTargetType.App,
+            targetId: treeSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         await server.inject({
@@ -260,7 +270,7 @@ describe('Data API', () => {
     });
 
     it('should handle invalid connector', async () => {
-        await app.dataService.setSchema({
+        const badSchema = {
             id: 'bad-connector-app',
             name: 'Bad App',
             tables: [
@@ -281,6 +291,14 @@ describe('Data API', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(badSchema);
+        await app.dataService.setPermission({
+            id: 'bad-permission',
+            targetType: PermissionTargetType.App,
+            targetId: badSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         const response = await server.inject({
@@ -296,7 +314,7 @@ describe('Data API', () => {
     });
 
     it('should handle nested actions (Process type)', async () => {
-        await app.dataService.setSchema({
+        const processSchema = {
             id: 'process-app',
             name: 'Process App',
             tables: [
@@ -334,6 +352,14 @@ describe('Data API', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(processSchema);
+        await app.dataService.setPermission({
+            id: 'process-permission',
+            targetType: PermissionTargetType.App,
+            targetId: processSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         const response = await server.inject({
@@ -352,7 +378,7 @@ describe('Data API', () => {
     });
 
     it('should handle recursion depth limit', async () => {
-        await app.dataService.setSchema({
+        const recursionSchema = {
             id: 'recursion-app',
             name: 'Recursion App',
             tables: [
@@ -380,6 +406,14 @@ describe('Data API', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(recursionSchema);
+        await app.dataService.setPermission({
+            id: 'recursion-permission',
+            targetType: PermissionTargetType.App,
+            targetId: recursionSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         const response = await server.inject({
@@ -395,6 +429,107 @@ describe('Data API', () => {
         expect(response.statusCode).toBe(500);
         const body = JSON.parse(response.payload);
         expect(body.error).toBe('Internal Server Error');
+    });
+
+    it('should return 401 for unauthenticated GET request', async () => {
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/app1/data/users'
+        });
+
+        expect(response.statusCode).toBe(401);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Unauthorized');
+    });
+
+    it('should return 401 for unauthenticated POST request', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/data/users',
+            payload: {
+                actionId: 'add',
+                rows: [{ id: 2, name: 'User 2' }]
+            }
+        });
+
+        expect(response.statusCode).toBe(401);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Unauthorized');
+    });
+
+    it('should return 403 for non-existent application (no permission)', async () => {
+        // When accessing a non-existent app, permission check happens first
+        // Since user has no permission for the app, 403 is returned (security best practice)
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/nonexistent/data/users',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        expect(response.statusCode).toBe(403);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Forbidden');
+    });
+
+    it('should return 404 for app with permission but missing schema', async () => {
+        // To trigger the 404 code path, we need to grant permission first
+        // then access an app where schema lookup fails
+        // First create a permission for a non-existent app
+        await server.inject({
+            method: 'POST',
+            url: '/api/permissions',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                targetType: 'app',
+                targetId: 'ghost-app',
+                email: 'test@example.com',
+                level: 'read'
+            }
+        });
+
+        // Now access the app - permission check passes, but schema doesn't exist
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/ghost-app/data/users',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        expect(response.statusCode).toBe(404);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Not Found');
+        expect(body.message).toBe('Application not found.');
+    });
+
+    it('should return 404 for POST on app with permission but missing schema', async () => {
+        // To trigger the 404 code path on POST, we need to grant permission first
+        // then try to post data to an app where schema lookup fails
+        await server.inject({
+            method: 'POST',
+            url: '/api/permissions',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                targetType: 'app',
+                targetId: 'ghost-app-post',
+                email: 'test@example.com',
+                level: 'write'
+            }
+        });
+
+        // Now POST to the app - permission check passes, but schema doesn't exist
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/ghost-app-post/data/users',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                actionId: 'add',
+                rows: [{ id: 1, name: 'Test' }]
+            }
+        });
+
+        expect(response.statusCode).toBe(404);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Not Found');
+        expect(body.message).toBe('Application not found.');
     });
 });
 
@@ -414,13 +549,18 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [memConnector, limitedConnector]
             }
         });
 
         const server = app.fastifyInstance;
         await server.ready();
-        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
+        const testEmail = 'dev@schemafx.com';
+        const token = app.fastifyInstance.jwt.sign({ email: testEmail });
 
         const schema = {
             id: 'limited-app',
@@ -443,6 +583,13 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
         };
 
         await app.dataService.setSchema(schema);
+        await app.dataService.setPermission({
+            id: 'limited-permission',
+            targetType: PermissionTargetType.App,
+            targetId: schema.id,
+            email: testEmail,
+            level: PermissionLevel.Read
+        });
 
         const response = await server.inject({
             method: 'GET',

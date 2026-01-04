@@ -3,16 +3,20 @@ import SchemaFX, {
     FileConnector,
     AppViewType,
     AppActionType,
-    AppFieldType
+    AppFieldType,
+    PermissionTargetType,
+    PermissionLevel
 } from '../src/index.js';
 import path from 'path';
 import AuthConnector from './connectors/authConnector.js';
+import { randomUUID } from 'crypto';
 
 const port = 3000;
 const filePath = path.join(process.cwd(), 'dev/database.json');
 
 const memoryConnector = new MemoryConnector({ name: 'Memory', id: 'memory' });
 const fileConnector = new FileConnector({ name: 'File System', id: 'file', filePath });
+const authConnector = new AuthConnector({ name: 'Dev', serverUri: `http://localhost:${port}/` });
 const defaultConnector = fileConnector.id;
 const app = new SchemaFX({
     jwtOpts: {
@@ -30,11 +34,11 @@ const app = new SchemaFX({
             connector: defaultConnector,
             path: ['connections']
         },
-        connectors: [
-            memoryConnector,
-            fileConnector,
-            new AuthConnector({ name: 'Dev', serverUri: `http://localhost:${port}/` })
-        ],
+        permissionsConnector: {
+            connector: defaultConnector,
+            path: ['permissions']
+        },
+        connectors: [memoryConnector, fileConnector, authConnector],
         encryptionKey:
             process.env.ENCRYPTION_KEY ||
             '1234567890123456789012345678901234567890123456789012345678901234'
@@ -151,6 +155,14 @@ if (!(await app.dataService.getSchema(devAppId))) {
                 }
             }
         ]
+    });
+
+    await app.dataService.setPermission({
+        id: randomUUID(),
+        email: authConnector.devEmail,
+        targetId: devAppId,
+        targetType: PermissionTargetType.App,
+        level: PermissionLevel.Admin
     });
 }
 

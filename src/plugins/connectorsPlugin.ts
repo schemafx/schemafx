@@ -1,6 +1,12 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { AppSchemaSchema, AppViewType, ConnectorTableSchema } from '../types.js';
+import {
+    AppSchemaSchema,
+    AppViewType,
+    ConnectorTableSchema,
+    PermissionLevel,
+    PermissionTargetType
+} from '../types.js';
 import { validateTableKeys } from '../utils/schemaUtils.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
@@ -240,6 +246,15 @@ const plugin: FastifyPluginAsyncZod<{
             };
 
             if (authResult.email) {
+                // Grant admin permission on the connection to the creator
+                await dataService.setPermission({
+                    id: randomUUID(),
+                    targetType: PermissionTargetType.Connection,
+                    targetId: connection.id,
+                    email: authResult.email,
+                    level: PermissionLevel.Admin
+                });
+
                 const token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
                 response.code = storeTokenCode(token);
             }
@@ -308,6 +323,15 @@ const plugin: FastifyPluginAsyncZod<{
             };
 
             if (authResult.email) {
+                // Grant admin permission on the connection to the creator
+                await dataService.setPermission({
+                    id: randomUUID(),
+                    targetType: PermissionTargetType.Connection,
+                    targetId: connection.id,
+                    email: authResult.email,
+                    level: PermissionLevel.Admin
+                });
+
                 const token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
                 response.code = storeTokenCode(token);
             }
@@ -365,6 +389,7 @@ const plugin: FastifyPluginAsyncZod<{
             validateTableKeys(table);
 
             let schema: AppSchema | undefined;
+            let isNewApp = false;
             if (appId) {
                 schema = await dataService.getSchema(appId);
 
@@ -377,6 +402,7 @@ const plugin: FastifyPluginAsyncZod<{
 
                 schema.tables.push(table);
             } else {
+                isNewApp = true;
                 schema = {
                     id: randomUUID(),
                     name: 'New App',
@@ -395,7 +421,20 @@ const plugin: FastifyPluginAsyncZod<{
                 };
             }
 
-            return dataService.setSchema(schema);
+            const savedSchema = await dataService.setSchema(schema);
+
+            // Grant admin permission on newly created app to the creator
+            if (isNewApp && request.user?.email) {
+                await dataService.setPermission({
+                    id: randomUUID(),
+                    targetType: PermissionTargetType.App,
+                    targetId: savedSchema.id,
+                    email: request.user.email,
+                    level: PermissionLevel.Admin
+                });
+            }
+
+            return savedSchema;
         }
     );
 };

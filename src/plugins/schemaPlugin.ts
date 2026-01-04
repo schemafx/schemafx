@@ -10,7 +10,8 @@ import {
     AppViewSchema,
     AppFieldSchema,
     AppActionSchema,
-    type AppSchema
+    type AppSchema,
+    PermissionTargetType
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
 import type DataService from '../services/DataService.js';
@@ -42,13 +43,37 @@ const plugin: FastifyPluginAsyncZod<{
     fastify.get(
         '/apps',
         {
+            onRequest: [fastify.authenticate],
             schema: {
                 response: {
-                    200: z.array(AppSchemaSchema)
+                    200: z.array(AppSchemaSchema),
+                    401: ErrorResponseSchema
                 }
             }
         },
-        async () => dataService.getData(dataService.schemaTable) as Promise<AppSchema[]>
+        async (request, reply) => {
+            const email = request.user?.email;
+
+            if (!email) {
+                return reply.code(401).send({
+                    error: 'Unauthorized',
+                    message: 'Authentication required.'
+                });
+            }
+
+            // Get all app permissions for this user
+            const userPermissions = await dataService.getPermissionsByUser(
+                email,
+                PermissionTargetType.App
+            );
+
+            // Get the app IDs the user has access to
+            const allowedAppIds = new Set(userPermissions.map(p => p.targetId));
+
+            // Get all apps and filter by permission
+            const allApps = (await dataService.getData(dataService.schemaTable)) as AppSchema[];
+            return allApps.filter(app => allowedAppIds.has(app.id));
+        }
     );
 
     fastify.delete(

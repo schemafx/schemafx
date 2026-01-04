@@ -8,7 +8,9 @@ import {
     QueryFilterOperator,
     DataSourceType,
     type DataSourceDefinition,
-    type ConnectorOptions
+    type ConnectorOptions,
+    PermissionTargetType,
+    PermissionLevel
 } from '../src/types.js';
 
 type BenchmarkConnectorOptions = ConnectorOptions & {
@@ -69,6 +71,7 @@ describe('DuckDB Integration Benchmark', () => {
     let app: SchemaFX;
     const schemaId = 'app1';
     let token: string;
+    const testEmail = 'dev@schemafx.com';
 
     beforeAll(async () => {
         const memConnector = new MemoryConnector({ name: 'memory' });
@@ -85,12 +88,16 @@ describe('DuckDB Integration Benchmark', () => {
                     connector: memConnector.id,
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: memConnector.id,
+                    path: ['permissions']
+                },
                 connectors: [memConnector, benchConnector]
             }
         });
 
         await app.fastifyInstance.ready();
-        token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
+        token = app.fastifyInstance.jwt.sign({ email: testEmail });
 
         await app.dataService.setSchema({
             id: schemaId,
@@ -110,6 +117,14 @@ describe('DuckDB Integration Benchmark', () => {
                 }
             ],
             views: []
+        });
+
+        await app.dataService.setPermission({
+            id: 'bench-permission',
+            targetType: PermissionTargetType.App,
+            targetId: schemaId,
+            email: testEmail,
+            level: PermissionLevel.Read
         });
     });
 

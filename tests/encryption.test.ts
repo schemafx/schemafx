@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestApp } from './testUtils.js';
+import { createTestApp, TEST_USER_EMAIL } from './testUtils.js';
 import { encrypt, decrypt } from '../src/utils/encryption.js';
-import { AppFieldType, AppActionType } from '../src/types.js';
+import {
+    AppFieldType,
+    AppActionType,
+    PermissionTargetType,
+    PermissionLevel
+} from '../src/types.js';
 
 describe('Encryption Utils', () => {
     const key = '1234567890123456789012345678901234567890123456789012345678901234'; // 32 bytes in hex
@@ -38,7 +43,7 @@ describe('Encrypted Fields Integration', () => {
         });
 
         // Setup schema with encrypted fields
-        await app.dataService.setSchema({
+        const encSchema = {
             id: 'enc-app',
             name: 'Encrypted App',
             tables: [
@@ -63,6 +68,14 @@ describe('Encrypted Fields Integration', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(encSchema);
+        await app.dataService.setPermission({
+            id: 'enc-permission',
+            targetType: PermissionTargetType.App,
+            targetId: encSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         const server = app.fastifyInstance;
@@ -115,7 +128,7 @@ describe('Encrypted Fields Integration', () => {
     it('should handle missing encryption key gracefully (store plain?) or throw?', async () => {
         const { app, connector, token } = await createTestApp(true);
 
-        await app.dataService.setSchema({
+        const plainSchema = {
             id: 'plain-app',
             name: 'Plain App',
             tables: [
@@ -132,6 +145,14 @@ describe('Encrypted Fields Integration', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(plainSchema);
+        await app.dataService.setPermission({
+            id: 'plain-permission',
+            targetType: PermissionTargetType.App,
+            targetId: plainSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         const server = app.fastifyInstance;
@@ -158,7 +179,7 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        await app.dataService.setSchema({
+        const falsySchema = {
             id: 'falsy-app',
             name: 'Falsy App',
             tables: [
@@ -176,6 +197,14 @@ describe('Encrypted Fields Integration', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(falsySchema);
+        await app.dataService.setPermission({
+            id: 'falsy-permission',
+            targetType: PermissionTargetType.App,
+            targetId: falsySchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         const server = app.fastifyInstance;
@@ -223,7 +252,7 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        await app.dataService.setSchema({
+        const errorSchema = {
             id: 'error-app',
             name: 'Error App',
             tables: [
@@ -240,6 +269,14 @@ describe('Encrypted Fields Integration', () => {
                 }
             ],
             views: []
+        };
+        await app.dataService.setSchema(errorSchema);
+        await app.dataService.setPermission({
+            id: 'error-permission',
+            targetType: PermissionTargetType.App,
+            targetId: errorSchema.id,
+            email: TEST_USER_EMAIL,
+            level: PermissionLevel.Admin
         });
 
         await connector.addRow!(

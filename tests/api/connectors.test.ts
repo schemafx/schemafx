@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestApp } from '../testUtils.js';
+import { createTestApp, TEST_USER_EMAIL } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
-import { MemoryConnector } from '../../src/index.js';
+import { MemoryConnector, PermissionLevel, PermissionTargetType } from '../../src/index.js';
 
 class MockAuthConnector extends MemoryConnector {
     constructor() {
@@ -130,6 +130,34 @@ describe('Connectors API', () => {
         expect(body.name).toBe('New App');
         expect(body.tables).toHaveLength(1);
         expect(body.tables[0].name).toBe('users');
+    });
+
+    it('should create admin permission for creator when creating new app', async () => {
+        // Create a new app via connector import (no appId = new app)
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/connectors/mem/table',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                path: ['users']
+            }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const newApp = JSON.parse(response.payload);
+        expect(newApp.id).toBeDefined();
+
+        // Verify that a permission was created for the creator
+        const permissions = await app.dataService.getPermissions({
+            targetType: PermissionTargetType.App,
+            targetId: newApp.id
+        });
+
+        expect(permissions.length).toBe(1);
+        expect(permissions[0]?.email).toBe(TEST_USER_EMAIL);
+        expect(permissions[0]?.level).toBe(PermissionLevel.Admin);
+        expect(permissions[0]?.targetType).toBe(PermissionTargetType.App);
+        expect(permissions[0]?.targetId).toBe(newApp.id);
     });
 
     it('should import table from connector to existing app', async () => {
