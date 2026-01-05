@@ -3,8 +3,6 @@ import SchemaFX, {
     AppFieldType,
     type AppSchema,
     MemoryConnector,
-    PermissionTargetType,
-    PermissionLevel,
     type AppTable
 } from '../src/index.js';
 
@@ -66,20 +64,11 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
         }
     });
 
-    await app.dataService.setSchema(schema);
+    await app.dataService.setSchema(schema, TEST_USER_EMAIL);
     await app.dataService.executeAction({
         table: schema.tables[0] as AppTable,
         actId: 'add',
         rows: [{ id: 1, name: 'User 1' }]
-    });
-
-    // Grant the test user admin permission on the test app
-    await app.dataService.setPermission({
-        id: 'test-permission',
-        targetType: PermissionTargetType.App,
-        targetId: schema.id,
-        email: TEST_USER_EMAIL,
-        level: PermissionLevel.Admin
     });
 
     // Create a signed JWT token directly for the test user

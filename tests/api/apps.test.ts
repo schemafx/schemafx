@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestApp, TEST_USER_EMAIL } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
-import { PermissionLevel, PermissionTargetType, type AppSchema } from '../../src/index.js';
+import { type AppSchema } from '../../src/index.js';
 
 describe('Apps endpoints', () => {
     let app: SchemaFX;
@@ -64,21 +64,15 @@ describe('Apps endpoints', () => {
 
     it('lists additional apps when user is granted permission', async () => {
         // Create a second app
-        await app.dataService.setSchema({
-            id: 'app2',
-            name: 'App 2',
-            tables: [],
-            views: []
-        });
-
-        // Grant permission to the test user for app2
-        await app.dataService.setPermission({
-            id: 'perm-app2',
-            targetType: PermissionTargetType.App,
-            targetId: 'app2',
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Read
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'app2',
+                name: 'App 2',
+                tables: [],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const res = await server.inject({
             method: 'GET',

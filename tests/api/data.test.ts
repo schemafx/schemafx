@@ -9,9 +9,7 @@ import {
     AppActionType,
     QueryFilterOperator,
     DataSourceType,
-    type DataSourceDefinition,
-    PermissionTargetType,
-    PermissionLevel
+    type DataSourceDefinition
 } from '../../src/types.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -200,42 +198,37 @@ describe('Data API', () => {
     });
 
     it('should handle recursive relationship max depth', async () => {
-        const treeSchema = {
-            id: 'tree',
-            name: 'Tree',
-            tables: [
-                {
-                    id: 'nodes',
-                    name: 'Nodes',
-                    connector: connector.id,
-                    path: ['nodes'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Text,
-                            isKey: true
-                        },
-                        {
-                            id: 'parent',
-                            name: 'Parent',
-                            type: AppFieldType.Reference,
-                            referenceTo: 'nodes'
-                        }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(treeSchema);
-        await app.dataService.setPermission({
-            id: 'tree-permission',
-            targetType: PermissionTargetType.App,
-            targetId: treeSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'tree',
+                name: 'Tree',
+                tables: [
+                    {
+                        id: 'nodes',
+                        name: 'Nodes',
+                        connector: connector.id,
+                        path: ['nodes'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Text,
+                                isKey: true
+                            },
+                            {
+                                id: 'parent',
+                                name: 'Parent',
+                                type: AppFieldType.Reference,
+                                referenceTo: 'nodes'
+                            }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         await server.inject({
             method: 'POST',
@@ -270,36 +263,31 @@ describe('Data API', () => {
     });
 
     it('should handle invalid connector', async () => {
-        const badSchema = {
-            id: 'bad-connector-app',
-            name: 'Bad App',
-            tables: [
-                {
-                    id: 't1',
-                    name: 'T1',
-                    connector: 'missing-connector',
-                    path: ['t1'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Text,
-                            isKey: true
-                        }
-                    ],
-                    actions: []
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(badSchema);
-        await app.dataService.setPermission({
-            id: 'bad-permission',
-            targetType: PermissionTargetType.App,
-            targetId: badSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'bad-connector-app',
+                name: 'Bad App',
+                tables: [
+                    {
+                        id: 't1',
+                        name: 'T1',
+                        connector: 'missing-connector',
+                        path: ['t1'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Text,
+                                isKey: true
+                            }
+                        ],
+                        actions: []
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const response = await server.inject({
             method: 'GET',
@@ -314,53 +302,48 @@ describe('Data API', () => {
     });
 
     it('should handle nested actions (Process type)', async () => {
-        const processSchema = {
-            id: 'process-app',
-            name: 'Process App',
-            tables: [
-                {
-                    id: 'users',
-                    name: 'Users',
-                    connector: connector.id,
-                    path: ['users'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Number,
-                            isKey: true
-                        },
-                        {
-                            id: 'name',
-                            name: 'Name',
-                            type: AppFieldType.Text
-                        }
-                    ],
-                    actions: [
-                        {
-                            id: 'add',
-                            name: 'Add',
-                            type: AppActionType.Add
-                        },
-                        {
-                            id: 'addWrapper',
-                            name: 'Add Wrapper',
-                            type: AppActionType.Process,
-                            config: { actions: ['add'] }
-                        }
-                    ]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(processSchema);
-        await app.dataService.setPermission({
-            id: 'process-permission',
-            targetType: PermissionTargetType.App,
-            targetId: processSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'process-app',
+                name: 'Process App',
+                tables: [
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        connector: connector.id,
+                        path: ['users'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Number,
+                                isKey: true
+                            },
+                            {
+                                id: 'name',
+                                name: 'Name',
+                                type: AppFieldType.Text
+                            }
+                        ],
+                        actions: [
+                            {
+                                id: 'add',
+                                name: 'Add',
+                                type: AppActionType.Add
+                            },
+                            {
+                                id: 'addWrapper',
+                                name: 'Add Wrapper',
+                                type: AppActionType.Process,
+                                config: { actions: ['add'] }
+                            }
+                        ]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const response = await server.inject({
             method: 'POST',
@@ -378,43 +361,38 @@ describe('Data API', () => {
     });
 
     it('should handle recursion depth limit', async () => {
-        const recursionSchema = {
-            id: 'recursion-app',
-            name: 'Recursion App',
-            tables: [
-                {
-                    id: 'users',
-                    name: 'Users',
-                    connector: connector.id,
-                    path: ['users'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Number,
-                            isKey: true
-                        }
-                    ],
-                    actions: [
-                        {
-                            id: 'infinite',
-                            name: 'Infinite',
-                            type: AppActionType.Process,
-                            config: { actions: ['infinite'] }
-                        }
-                    ]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(recursionSchema);
-        await app.dataService.setPermission({
-            id: 'recursion-permission',
-            targetType: PermissionTargetType.App,
-            targetId: recursionSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'recursion-app',
+                name: 'Recursion App',
+                tables: [
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        connector: connector.id,
+                        path: ['users'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Number,
+                                isKey: true
+                            }
+                        ],
+                        actions: [
+                            {
+                                id: 'infinite',
+                                name: 'Infinite',
+                                type: AppActionType.Process,
+                                config: { actions: ['infinite'] }
+                            }
+                        ]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const response = await server.inject({
             method: 'POST',
@@ -582,14 +560,7 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
             views: []
         };
 
-        await app.dataService.setSchema(schema);
-        await app.dataService.setPermission({
-            id: 'limited-permission',
-            targetType: PermissionTargetType.App,
-            targetId: schema.id,
-            email: testEmail,
-            level: PermissionLevel.Read
-        });
+        await app.dataService.setSchema(schema, testEmail);
 
         const response = await server.inject({
             method: 'GET',

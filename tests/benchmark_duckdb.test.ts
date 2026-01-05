@@ -8,9 +8,7 @@ import {
     QueryFilterOperator,
     DataSourceType,
     type DataSourceDefinition,
-    type ConnectorOptions,
-    PermissionTargetType,
-    PermissionLevel
+    type ConnectorOptions
 } from '../src/types.js';
 
 type BenchmarkConnectorOptions = ConnectorOptions & {
@@ -96,36 +94,33 @@ describe('DuckDB Integration Benchmark', () => {
             }
         });
 
-        await app.fastifyInstance.ready();
-        token = app.fastifyInstance.jwt.sign({ email: testEmail });
+        const server = app.fastifyInstance;
 
-        await app.dataService.setSchema({
-            id: schemaId,
-            name: 'Benchmark App',
-            tables: [
-                {
-                    id: 'users',
-                    name: 'Users',
-                    connector: benchConnector.id,
-                    path: ['users'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Number },
-                        { id: 'name', name: 'Name', type: AppFieldType.Text },
-                        { id: 'active', name: 'Active', type: AppFieldType.Boolean }
-                    ],
-                    actions: []
-                }
-            ],
-            views: []
-        });
+        await server.ready();
+        token = server.jwt.sign({ email: testEmail });
 
-        await app.dataService.setPermission({
-            id: 'bench-permission',
-            targetType: PermissionTargetType.App,
-            targetId: schemaId,
-            email: testEmail,
-            level: PermissionLevel.Read
-        });
+        await app.dataService.setSchema(
+            {
+                id: schemaId,
+                name: 'Benchmark App',
+                tables: [
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        connector: benchConnector.id,
+                        path: ['users'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Number },
+                            { id: 'name', name: 'Name', type: AppFieldType.Text },
+                            { id: 'active', name: 'Active', type: AppFieldType.Boolean }
+                        ],
+                        actions: []
+                    }
+                ],
+                views: []
+            },
+            testEmail
+        );
     });
 
     afterAll(async () => {

@@ -3,6 +3,7 @@ import { createTestApp } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
 import { MemoryConnector, PermissionLevel, PermissionTargetType } from '../../src/index.js';
+import { randomUUID } from 'node:crypto';
 
 class MockAuthConnector extends MemoryConnector {
     private userEmail: string;
@@ -53,7 +54,7 @@ describe('Permissions Management API', () => {
             // Note: createTestApp() already creates a permission for TEST_USER_EMAIL on app1
             // Create an additional permission
             await app.dataService.setPermission({
-                id: 'perm-1',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -85,8 +86,10 @@ describe('Permissions Management API', () => {
 
     describe('GET /permissions/:permissionId', () => {
         it('should get a specific permission', async () => {
+            const permissionId = randomUUID();
+
             await app.dataService.setPermission({
-                id: 'perm-specific',
+                id: permissionId,
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -95,20 +98,20 @@ describe('Permissions Management API', () => {
 
             const response = await server.inject({
                 method: 'GET',
-                url: '/api/permissions/perm-specific',
+                url: `api/permissions/${permissionId}`,
                 headers: { Authorization: `Bearer ${adminToken}` }
             });
 
             expect(response.statusCode).toBe(200);
             const body = JSON.parse(response.payload);
-            expect(body.id).toBe('perm-specific');
+            expect(body.id).toBe(permissionId);
             expect(body.level).toBe(PermissionLevel.Write);
         });
 
         it('should return 404 for non-existent permission', async () => {
             const response = await server.inject({
                 method: 'GET',
-                url: '/api/permissions/nonexistent',
+                url: `/api/permissions/${randomUUID()}`,
                 headers: { Authorization: `Bearer ${adminToken}` }
             });
 
@@ -158,7 +161,7 @@ describe('Permissions Management API', () => {
 
         it('should return 409 if user already has permission', async () => {
             await app.dataService.setPermission({
-                id: 'existing-perm',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'existing@example.com',
@@ -183,8 +186,10 @@ describe('Permissions Management API', () => {
 
     describe('PUT /permissions/:permissionId', () => {
         it('should update permission level', async () => {
+            const permissionId = randomUUID();
+
             await app.dataService.setPermission({
-                id: 'perm-to-update',
+                id: permissionId,
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'update@example.com',
@@ -193,7 +198,7 @@ describe('Permissions Management API', () => {
 
             const response = await server.inject({
                 method: 'PUT',
-                url: '/api/permissions/perm-to-update',
+                url: `/api/permissions/${permissionId}`,
                 headers: { Authorization: `Bearer ${adminToken}` },
                 payload: {
                     level: PermissionLevel.Admin
@@ -208,7 +213,7 @@ describe('Permissions Management API', () => {
         it('should return 404 for non-existent permission', async () => {
             const response = await server.inject({
                 method: 'PUT',
-                url: '/api/permissions/nonexistent',
+                url: `/api/permissions/${randomUUID()}`,
                 headers: { Authorization: `Bearer ${adminToken}` },
                 payload: {
                     level: PermissionLevel.Write
@@ -221,8 +226,10 @@ describe('Permissions Management API', () => {
 
     describe('DELETE /permissions/:permissionId', () => {
         it('should delete a permission', async () => {
+            const permissionId = randomUUID();
+
             await app.dataService.setPermission({
-                id: 'perm-to-delete',
+                id: permissionId,
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'delete@example.com',
@@ -231,7 +238,7 @@ describe('Permissions Management API', () => {
 
             const response = await server.inject({
                 method: 'DELETE',
-                url: '/api/permissions/perm-to-delete',
+                url: `/api/permissions/${permissionId}`,
                 headers: { Authorization: `Bearer ${adminToken}` }
             });
 
@@ -240,14 +247,14 @@ describe('Permissions Management API', () => {
             expect(body.success).toBe(true);
 
             // Verify it's deleted
-            const permission = await app.dataService.getPermission('perm-to-delete');
+            const permission = await app.dataService.getPermission(permissionId);
             expect(permission).toBeUndefined();
         });
 
         it('should return 404 for non-existent permission', async () => {
             const response = await server.inject({
                 method: 'DELETE',
-                url: '/api/permissions/nonexistent',
+                url: `/api/permissions/${randomUUID()}`,
                 headers: { Authorization: `Bearer ${adminToken}` }
             });
 
@@ -258,7 +265,7 @@ describe('Permissions Management API', () => {
     describe('GET /permissions/:targetType/:targetId/me', () => {
         it('should return current user permission', async () => {
             await app.dataService.setPermission({
-                id: 'perm-me',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'admin@example.com',
@@ -336,7 +343,7 @@ describe('Data Endpoints with Permissions', () => {
 
         it('should allow access with read permission', async () => {
             await app.dataService.setPermission({
-                id: 'perm-read',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -354,7 +361,7 @@ describe('Data Endpoints with Permissions', () => {
 
         it('should allow access with write permission (higher level)', async () => {
             await app.dataService.setPermission({
-                id: 'perm-write',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -388,7 +395,7 @@ describe('Data Endpoints with Permissions', () => {
 
         it('should return 403 when user only has read permission', async () => {
             await app.dataService.setPermission({
-                id: 'perm-read-only',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -410,7 +417,7 @@ describe('Data Endpoints with Permissions', () => {
 
         it('should allow access with write permission', async () => {
             await app.dataService.setPermission({
-                id: 'perm-write',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -432,7 +439,7 @@ describe('Data Endpoints with Permissions', () => {
 
         it('should allow access with admin permission', async () => {
             await app.dataService.setPermission({
-                id: 'perm-admin',
+                id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
                 email: 'user@example.com',
@@ -468,7 +475,7 @@ describe('DataService Permission Methods', () => {
 
     it('should check permission levels correctly', async () => {
         await app.dataService.setPermission({
-            id: 'perm-1',
+            id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'reader@example.com',
@@ -500,7 +507,7 @@ describe('DataService Permission Methods', () => {
 
     it('should handle case-insensitive email lookup', async () => {
         await app.dataService.setPermission({
-            id: 'perm-case',
+            id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'User@Example.COM',
@@ -518,14 +525,14 @@ describe('DataService Permission Methods', () => {
     it('should delete all permissions for a target', async () => {
         // Note: createTestApp() already creates a permission for TEST_USER_EMAIL on app1
         await app.dataService.setPermission({
-            id: 'perm-del-1',
+            id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'user1@example.com',
             level: PermissionLevel.Read
         });
         await app.dataService.setPermission({
-            id: 'perm-del-2',
+            id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'user2@example.com',
@@ -552,14 +559,14 @@ describe('DataService Permission Methods', () => {
 
     it('should keep different targets separate', async () => {
         const connection = await app.dataService.setConnection({
-            id: 'test-conn',
+            id: randomUUID(),
             name: 'Test Connection',
             connector: 'mem',
             content: 'test'
         });
 
         await app.dataService.setPermission({
-            id: 'perm-app',
+            id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'user@example.com',
@@ -567,7 +574,7 @@ describe('DataService Permission Methods', () => {
         });
 
         await app.dataService.setPermission({
-            id: 'perm-conn',
+            id: randomUUID(),
             targetType: PermissionTargetType.Connection,
             targetId: connection.id,
             email: 'user@example.com',
@@ -589,14 +596,14 @@ describe('DataService Permission Methods', () => {
 
     it('should get all permissions for a user across all target types', async () => {
         const connection = await app.dataService.setConnection({
-            id: 'test-conn-all',
+            id: randomUUID(),
             name: 'Test Connection',
             connector: 'mem',
             content: 'test'
         });
 
         await app.dataService.setPermission({
-            id: 'perm-user-app',
+            id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'allperms@example.com',
@@ -604,7 +611,7 @@ describe('DataService Permission Methods', () => {
         });
 
         await app.dataService.setPermission({
-            id: 'perm-user-conn',
+            id: randomUUID(),
             targetType: PermissionTargetType.Connection,
             targetId: connection.id,
             email: 'allperms@example.com',
@@ -637,9 +644,11 @@ describe('Permissions API - Unauthenticated Access', () => {
     });
 
     it('should return 401 for GET /permissions/:permissionId without authentication', async () => {
+        const permissionId = randomUUID();
+
         // Create a permission to test against
         await app.dataService.setPermission({
-            id: 'test-perm',
+            id: permissionId,
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'user@example.com',
@@ -648,7 +657,7 @@ describe('Permissions API - Unauthenticated Access', () => {
 
         const response = await server.inject({
             method: 'GET',
-            url: '/api/permissions/test-perm'
+            url: `/api/permissions/${permissionId}`
         });
 
         expect(response.statusCode).toBe(401);
@@ -674,9 +683,10 @@ describe('Permissions API - Unauthenticated Access', () => {
     });
 
     it('should return 401 for PUT /permissions/:permissionId without authentication', async () => {
+        const permissionId = randomUUID();
         // Create a permission to test against
         await app.dataService.setPermission({
-            id: 'test-perm-update',
+            id: permissionId,
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'user@example.com',
@@ -685,7 +695,7 @@ describe('Permissions API - Unauthenticated Access', () => {
 
         const response = await server.inject({
             method: 'PUT',
-            url: '/api/permissions/test-perm-update',
+            url: `/api/permissions/${permissionId}`,
             payload: {
                 level: PermissionLevel.Write
             }
@@ -697,9 +707,11 @@ describe('Permissions API - Unauthenticated Access', () => {
     });
 
     it('should return 401 for DELETE /permissions/:permissionId without authentication', async () => {
+        const permissionId = randomUUID();
+
         // Create a permission to test against
         await app.dataService.setPermission({
-            id: 'test-perm-delete',
+            id: permissionId,
             targetType: PermissionTargetType.App,
             targetId: 'app1',
             email: 'user@example.com',
@@ -708,7 +720,7 @@ describe('Permissions API - Unauthenticated Access', () => {
 
         const response = await server.inject({
             method: 'DELETE',
-            url: '/api/permissions/test-perm-delete'
+            url: `/api/permissions/${permissionId}`
         });
 
         expect(response.statusCode).toBe(401);

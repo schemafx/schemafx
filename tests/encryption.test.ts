@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createTestApp, TEST_USER_EMAIL } from './testUtils.js';
 import { encrypt, decrypt } from '../src/utils/encryption.js';
-import {
-    AppFieldType,
-    AppActionType,
-    PermissionTargetType,
-    PermissionLevel
-} from '../src/types.js';
+import { AppFieldType, AppActionType } from '../src/types.js';
 
 describe('Encryption Utils', () => {
     const key = '1234567890123456789012345678901234567890123456789012345678901234'; // 32 bytes in hex
@@ -43,40 +38,40 @@ describe('Encrypted Fields Integration', () => {
         });
 
         // Setup schema with encrypted fields
-        const encSchema = {
-            id: 'enc-app',
-            name: 'Encrypted App',
-            tables: [
-                {
-                    id: 'secrets',
-                    name: 'Secrets',
-                    connector: connector.id,
-                    path: ['secrets'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'secret', name: 'Secret', type: AppFieldType.Text, encrypted: true },
-                        {
-                            id: 'confidential',
-                            name: 'Confidential',
-                            type: AppFieldType.JSON,
-                            encrypted: true,
-                            fields: [{ id: 'code', name: 'Code', type: AppFieldType.Number }]
-                        },
-                        { id: 'public', name: 'Public', type: AppFieldType.Text }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(encSchema);
-        await app.dataService.setPermission({
-            id: 'enc-permission',
-            targetType: PermissionTargetType.App,
-            targetId: encSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'enc-app',
+                name: 'Encrypted App',
+                tables: [
+                    {
+                        id: 'secrets',
+                        name: 'Secrets',
+                        connector: connector.id,
+                        path: ['secrets'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            {
+                                id: 'secret',
+                                name: 'Secret',
+                                type: AppFieldType.Text,
+                                encrypted: true
+                            },
+                            {
+                                id: 'confidential',
+                                name: 'Confidential',
+                                type: AppFieldType.JSON,
+                                encrypted: true,
+                                fields: [{ id: 'code', name: 'Code', type: AppFieldType.Number }]
+                            },
+                            { id: 'public', name: 'Public', type: AppFieldType.Text }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const server = app.fastifyInstance;
 
@@ -128,32 +123,32 @@ describe('Encrypted Fields Integration', () => {
     it('should handle missing encryption key gracefully (store plain?) or throw?', async () => {
         const { app, connector, token } = await createTestApp(true);
 
-        const plainSchema = {
-            id: 'plain-app',
-            name: 'Plain App',
-            tables: [
-                {
-                    id: 'secrets',
-                    name: 'Secrets',
-                    connector: connector.id,
-                    path: ['secrets'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'secret', name: 'Secret', type: AppFieldType.Text, encrypted: true }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(plainSchema);
-        await app.dataService.setPermission({
-            id: 'plain-permission',
-            targetType: PermissionTargetType.App,
-            targetId: plainSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'plain-app',
+                name: 'Plain App',
+                tables: [
+                    {
+                        id: 'secrets',
+                        name: 'Secrets',
+                        connector: connector.id,
+                        path: ['secrets'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            {
+                                id: 'secret',
+                                name: 'Secret',
+                                type: AppFieldType.Text,
+                                encrypted: true
+                            }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const server = app.fastifyInstance;
 
@@ -179,33 +174,28 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        const falsySchema = {
-            id: 'falsy-app',
-            name: 'Falsy App',
-            tables: [
-                {
-                    id: 'data',
-                    name: 'Data',
-                    connector: connector.id,
-                    path: ['data'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'flag', name: 'Flag', type: AppFieldType.JSON, encrypted: true },
-                        { id: 'zero', name: 'Zero', type: AppFieldType.JSON, encrypted: true }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(falsySchema);
-        await app.dataService.setPermission({
-            id: 'falsy-permission',
-            targetType: PermissionTargetType.App,
-            targetId: falsySchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'falsy-app',
+                name: 'Falsy App',
+                tables: [
+                    {
+                        id: 'data',
+                        name: 'Data',
+                        connector: connector.id,
+                        path: ['data'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            { id: 'flag', name: 'Flag', type: AppFieldType.JSON, encrypted: true },
+                            { id: 'zero', name: 'Zero', type: AppFieldType.JSON, encrypted: true }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const server = app.fastifyInstance;
 
@@ -252,32 +242,32 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        const errorSchema = {
-            id: 'error-app',
-            name: 'Error App',
-            tables: [
-                {
-                    id: 'secrets',
-                    name: 'Secrets',
-                    connector: connector.id,
-                    path: ['secrets'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'secret', name: 'Secret', type: AppFieldType.Text, encrypted: true }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        };
-        await app.dataService.setSchema(errorSchema);
-        await app.dataService.setPermission({
-            id: 'error-permission',
-            targetType: PermissionTargetType.App,
-            targetId: errorSchema.id,
-            email: TEST_USER_EMAIL,
-            level: PermissionLevel.Admin
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'error-app',
+                name: 'Error App',
+                tables: [
+                    {
+                        id: 'secrets',
+                        name: 'Secrets',
+                        connector: connector.id,
+                        path: ['secrets'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            {
+                                id: 'secret',
+                                name: 'Secret',
+                                type: AppFieldType.Text,
+                                encrypted: true
+                            }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         await connector.addRow!(
             {

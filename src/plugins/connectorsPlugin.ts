@@ -389,7 +389,6 @@ const plugin: FastifyPluginAsyncZod<{
             validateTableKeys(table);
 
             let schema: AppSchema | undefined;
-            let isNewApp = false;
             if (appId) {
                 schema = await dataService.getSchema(appId);
 
@@ -419,7 +418,6 @@ const plugin: FastifyPluginAsyncZod<{
 
                 schema.tables.push(table);
             } else {
-                isNewApp = true;
                 schema = {
                     id: randomUUID(),
                     name: 'New App',
@@ -438,20 +436,7 @@ const plugin: FastifyPluginAsyncZod<{
                 };
             }
 
-            const savedSchema = await dataService.setSchema(schema);
-
-            // Grant admin permission on newly created app to the creator
-            if (isNewApp && request.user?.email) {
-                await dataService.setPermission({
-                    id: randomUUID(),
-                    targetType: PermissionTargetType.App,
-                    targetId: savedSchema.id,
-                    email: request.user.email,
-                    level: PermissionLevel.Admin
-                });
-            }
-
-            return savedSchema;
+            return dataService.setSchema(schema, request.user?.email);
         }
     );
 };

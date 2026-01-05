@@ -411,7 +411,7 @@ const plugin: FastifyPluginAsyncZod<{
                     break;
             }
 
-            return dataService.setSchema(schema);
+            return dataService.setSchema(schema, request.user?.email);
         }
     );
 };

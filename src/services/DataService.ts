@@ -14,7 +14,7 @@ import {
     type AppPermission,
     PermissionLevel
 } from '../types.js';
-import type { PermissionTargetType } from '../types.js';
+import { PermissionTargetType } from '../types.js';
 import type { z } from 'zod';
 import { type AppTableFromZodOptions, tableFromZod, zodFromTable } from '../utils/zodUtils.js';
 import { getData as getDuckDBData } from '../utils/duckdb.js';
@@ -453,7 +453,7 @@ export default class DataService {
         return schema;
     }
 
-    async setSchema(schema: AppSchema) {
+    async setSchema(schema: AppSchema, owner?: string) {
         const hasSchema = await this.getSchema(schema.id);
         this.schemaCache.set(schema.id, schema);
 
@@ -462,6 +462,16 @@ export default class DataService {
             actId: hasSchema ? 'update' : 'add',
             rows: [schema]
         });
+
+        if (!hasSchema && owner) {
+            await this.setPermission({
+                id: randomUUID(),
+                targetType: PermissionTargetType.App,
+                targetId: schema.id,
+                email: owner.toLowerCase(),
+                level: PermissionLevel.Admin
+            });
+        }
 
         return schema;
     }
