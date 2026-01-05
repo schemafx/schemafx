@@ -460,7 +460,7 @@ describe('Data API', () => {
             payload: {
                 targetType: 'app',
                 targetId: 'ghost-app',
-                email: 'test@example.com',
+                email: 'test@schemafx.com',
                 level: 'read'
             }
         });
@@ -488,7 +488,7 @@ describe('Data API', () => {
             payload: {
                 targetType: 'app',
                 targetId: 'ghost-app-post',
-                email: 'test@example.com',
+                email: 'test@schemafx.com',
                 level: 'write'
             }
         });

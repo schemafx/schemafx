@@ -13,7 +13,7 @@ class MockAuthConnectorWithEmail extends MemoryConnector {
         return {
             name: 'Mock Login Connection',
             content: JSON.stringify({ token: 'mock-token', ...params }),
-            email: 'user@example.com'
+            email: 'user@schemafx.com'
         };
     }
 }

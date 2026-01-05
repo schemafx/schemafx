@@ -6,7 +6,7 @@ import SchemaFX, {
     type AppTable
 } from '../src/index.js';
 
-export const TEST_USER_EMAIL = 'test@example.com';
+export const TEST_USER_EMAIL = 'test@schemafx.com';
 
 export async function createTestApp(includeToken?: boolean, opts?: { encryptionKey?: string }) {
     const connector = new MemoryConnector({ name: 'Memory', id: 'mem' });

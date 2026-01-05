@@ -94,7 +94,7 @@ describe('zodUtils', () => {
                 type: AppFieldType.Email
             });
 
-            expect(schema.safeParse('test@example.com').success).toBe(true);
+            expect(schema.safeParse('test@schemafx.com').success).toBe(true);
             expect(schema.safeParse('invalid').success).toBe(false);
         });
 

@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 class MockAuthConnector extends MemoryConnector {
     private userEmail: string;
 
-    constructor(email: string = 'admin@example.com') {
+    constructor(email: string = 'admin@schemafx.com') {
         super({ name: 'AuthConnector', id: 'auth' });
         this.userEmail = email;
     }
@@ -32,7 +32,7 @@ describe('Permissions Management API', () => {
         app = testApp.app;
         server = app.fastifyInstance;
 
-        const adminConnector = new MockAuthConnector('admin@example.com');
+        const adminConnector = new MockAuthConnector('admin@schemafx.com');
         app.dataService.connectors['auth-admin'] = adminConnector;
 
         await server.ready();
@@ -57,7 +57,7 @@ describe('Permissions Management API', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Read
             });
 
@@ -70,8 +70,8 @@ describe('Permissions Management API', () => {
             expect(response.statusCode).toBe(200);
             const body = JSON.parse(response.payload);
             expect(Array.isArray(body)).toBe(true);
-            expect(body.length).toBe(2); // TEST_USER_EMAIL + user@example.com
-            expect(body.some((p: { email: string }) => p.email === 'user@example.com')).toBe(true);
+            expect(body.length).toBe(2); // TEST_USER_EMAIL + user@schemafx.com
+            expect(body.some((p: { email: string }) => p.email === 'user@schemafx.com')).toBe(true);
         });
 
         it('should return 401 without authentication', async () => {
@@ -92,7 +92,7 @@ describe('Permissions Management API', () => {
                 id: permissionId,
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Write
             });
 
@@ -128,14 +128,14 @@ describe('Permissions Management API', () => {
                 payload: {
                     targetType: PermissionTargetType.App,
                     targetId: 'app1',
-                    email: 'newuser@example.com',
+                    email: 'newuser@schemafx.com',
                     level: PermissionLevel.Read
                 }
             });
 
             expect(response.statusCode).toBe(201);
             const body = JSON.parse(response.payload);
-            expect(body.email).toBe('newuser@example.com');
+            expect(body.email).toBe('newuser@schemafx.com');
             expect(body.level).toBe(PermissionLevel.Read);
             expect(body.targetType).toBe(PermissionTargetType.App);
             expect(body.targetId).toBe('app1');
@@ -149,14 +149,14 @@ describe('Permissions Management API', () => {
                 payload: {
                     targetType: PermissionTargetType.App,
                     targetId: 'app1',
-                    email: 'UPPERCASE@EXAMPLE.COM',
+                    email: 'UPPERCASE@SCHEMAFX.COM',
                     level: PermissionLevel.Write
                 }
             });
 
             expect(response.statusCode).toBe(201);
             const body = JSON.parse(response.payload);
-            expect(body.email).toBe('uppercase@example.com');
+            expect(body.email).toBe('uppercase@schemafx.com');
         });
 
         it('should return 409 if user already has permission', async () => {
@@ -164,7 +164,7 @@ describe('Permissions Management API', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'existing@example.com',
+                email: 'existing@schemafx.com',
                 level: PermissionLevel.Read
             });
 
@@ -175,7 +175,7 @@ describe('Permissions Management API', () => {
                 payload: {
                     targetType: PermissionTargetType.App,
                     targetId: 'app1',
-                    email: 'existing@example.com',
+                    email: 'existing@schemafx.com',
                     level: PermissionLevel.Write
                 }
             });
@@ -192,7 +192,7 @@ describe('Permissions Management API', () => {
                 id: permissionId,
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'update@example.com',
+                email: 'update@schemafx.com',
                 level: PermissionLevel.Read
             });
 
@@ -232,7 +232,7 @@ describe('Permissions Management API', () => {
                 id: permissionId,
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'delete@example.com',
+                email: 'delete@schemafx.com',
                 level: PermissionLevel.Read
             });
 
@@ -268,7 +268,7 @@ describe('Permissions Management API', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'admin@example.com',
+                email: 'admin@schemafx.com',
                 level: PermissionLevel.Admin
             });
 
@@ -280,7 +280,7 @@ describe('Permissions Management API', () => {
 
             expect(response.statusCode).toBe(200);
             const body = JSON.parse(response.payload);
-            expect(body.email).toBe('admin@example.com');
+            expect(body.email).toBe('admin@schemafx.com');
             expect(body.level).toBe(PermissionLevel.Admin);
         });
 
@@ -308,8 +308,8 @@ describe('Data Endpoints with Permissions', () => {
         app = testApp.app;
         server = app.fastifyInstance;
 
-        const adminConnector = new MockAuthConnector('admin@example.com');
-        const userConnector = new MockAuthConnector('user@example.com');
+        const adminConnector = new MockAuthConnector('admin@schemafx.com');
+        const userConnector = new MockAuthConnector('user@schemafx.com');
 
         app.dataService.connectors['auth-admin'] = adminConnector;
         app.dataService.connectors['auth-user'] = userConnector;
@@ -346,7 +346,7 @@ describe('Data Endpoints with Permissions', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Read
             });
 
@@ -364,7 +364,7 @@ describe('Data Endpoints with Permissions', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Write
             });
 
@@ -398,7 +398,7 @@ describe('Data Endpoints with Permissions', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Read
             });
 
@@ -420,7 +420,7 @@ describe('Data Endpoints with Permissions', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Write
             });
 
@@ -442,7 +442,7 @@ describe('Data Endpoints with Permissions', () => {
                 id: randomUUID(),
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'user@example.com',
+                email: 'user@schemafx.com',
                 level: PermissionLevel.Admin
             });
 
@@ -478,28 +478,28 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'reader@example.com',
+            email: 'reader@schemafx.com',
             level: PermissionLevel.Read
         });
 
         expect(
             await app.dataService.hasPermission(
                 { targetType: PermissionTargetType.App, targetId: 'app1' },
-                'reader@example.com',
+                'reader@schemafx.com',
                 PermissionLevel.Read
             )
         ).toBe(true);
         expect(
             await app.dataService.hasPermission(
                 { targetType: PermissionTargetType.App, targetId: 'app1' },
-                'reader@example.com',
+                'reader@schemafx.com',
                 PermissionLevel.Write
             )
         ).toBe(false);
         expect(
             await app.dataService.hasPermission(
                 { targetType: PermissionTargetType.App, targetId: 'app1' },
-                'reader@example.com',
+                'reader@schemafx.com',
                 PermissionLevel.Admin
             )
         ).toBe(false);
@@ -510,16 +510,16 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'User@Example.COM',
+            email: 'User@SchemaFX.COM',
             level: PermissionLevel.Read
         });
 
         const permission = await app.dataService.getUserPermission(
             { targetType: PermissionTargetType.App, targetId: 'app1' },
-            'USER@EXAMPLE.COM'
+            'USER@SCHEMAFX.COM'
         );
         expect(permission).toBeDefined();
-        expect(permission?.email).toBe('user@example.com');
+        expect(permission?.email).toBe('user@schemafx.com');
     });
 
     it('should delete all permissions for a target', async () => {
@@ -528,14 +528,14 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'user1@example.com',
+            email: 'user1@schemafx.com',
             level: PermissionLevel.Read
         });
         await app.dataService.setPermission({
             id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'user2@example.com',
+            email: 'user2@schemafx.com',
             level: PermissionLevel.Write
         });
 
@@ -569,7 +569,7 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'user@example.com',
+            email: 'user@schemafx.com',
             level: PermissionLevel.Read
         });
 
@@ -577,17 +577,17 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.Connection,
             targetId: connection.id,
-            email: 'user@example.com',
+            email: 'user@schemafx.com',
             level: PermissionLevel.Admin
         });
 
         const appPermission = await app.dataService.getUserPermission(
             { targetType: PermissionTargetType.App, targetId: 'app1' },
-            'user@example.com'
+            'user@schemafx.com'
         );
         const connPermission = await app.dataService.getUserPermission(
             { targetType: PermissionTargetType.Connection, targetId: connection.id },
-            'user@example.com'
+            'user@schemafx.com'
         );
 
         expect(appPermission?.level).toBe(PermissionLevel.Read);
@@ -606,7 +606,7 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'allperms@example.com',
+            email: 'allperms@schemafx.com',
             level: PermissionLevel.Read
         });
 
@@ -614,12 +614,12 @@ describe('DataService Permission Methods', () => {
             id: randomUUID(),
             targetType: PermissionTargetType.Connection,
             targetId: connection.id,
-            email: 'allperms@example.com',
+            email: 'allperms@schemafx.com',
             level: PermissionLevel.Admin
         });
 
         // Get all permissions without filtering by target type
-        const allPermissions = await app.dataService.getPermissionsByUser('allperms@example.com');
+        const allPermissions = await app.dataService.getPermissionsByUser('allperms@schemafx.com');
         expect(allPermissions.length).toBe(2);
         expect(allPermissions.some(p => p.targetType === PermissionTargetType.App)).toBe(true);
         expect(allPermissions.some(p => p.targetType === PermissionTargetType.Connection)).toBe(
@@ -651,7 +651,7 @@ describe('Permissions API - Unauthenticated Access', () => {
             id: permissionId,
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'user@example.com',
+            email: 'user@schemafx.com',
             level: PermissionLevel.Read
         });
 
@@ -672,7 +672,7 @@ describe('Permissions API - Unauthenticated Access', () => {
             payload: {
                 targetType: PermissionTargetType.App,
                 targetId: 'app1',
-                email: 'newuser@example.com',
+                email: 'newuser@schemafx.com',
                 level: PermissionLevel.Read
             }
         });
@@ -689,7 +689,7 @@ describe('Permissions API - Unauthenticated Access', () => {
             id: permissionId,
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'user@example.com',
+            email: 'user@schemafx.com',
             level: PermissionLevel.Read
         });
 
@@ -714,7 +714,7 @@ describe('Permissions API - Unauthenticated Access', () => {
             id: permissionId,
             targetType: PermissionTargetType.App,
             targetId: 'app1',
-            email: 'user@example.com',
+            email: 'user@schemafx.com',
             level: PermissionLevel.Read
         });
 
