@@ -16,6 +16,11 @@ declare module '@fastify/jwt' {
     }
 }
 
+interface CustomError extends Error {
+    code?: string;
+    validation?: { field: string; message: string }[];
+}
+
 describe('Core SchemaFX', () => {
     it('should initialize with default options', async () => {
         const app = new SchemaFX({
@@ -278,13 +283,8 @@ describe('Core SchemaFX', () => {
             }
         });
 
-        await new Promise<void>((resolve, reject) => {
-            app.listen({ port: 0 }, (err, address) => {
-                if (err) reject(err);
-                expect(address).toBeDefined();
-                resolve();
-            });
-        });
+        const address = await app.listen({ port: 0 });
+        expect(address).toBeDefined();
 
         await app.fastifyInstance.close();
     });
@@ -400,7 +400,7 @@ describe('Core SchemaFX', () => {
         const server = app.fastifyInstance;
 
         server.get('/fastify-validation-error', async () => {
-            const error: any = new Error('Fastify Validation Error');
+            const error: CustomError = new Error('Fastify Validation Error');
             error.validation = [{ field: 'test', message: 'invalid' }];
             throw error;
         });
@@ -425,7 +425,7 @@ describe('Core SchemaFX', () => {
         const server = app.fastifyInstance;
 
         server.get('/fst-validation-error', async () => {
-            const error: any = new Error('Manual Validation Error');
+            const error: CustomError = new Error('Manual Validation Error');
             error.code = 'FST_ERR_VALIDATION';
             throw error;
         });
@@ -469,7 +469,7 @@ describe('Core SchemaFX', () => {
         // Add a route that uses the 'authenticate' decorator
         server.get('/protected-valid', { onRequest: [server.authenticate] }, async req => {
             // If jwtVerify passes, req.user should be populated
-            return { user: (req as any).user };
+            return { user: req.user };
         });
 
         await server.ready();

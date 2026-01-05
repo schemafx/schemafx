@@ -104,16 +104,16 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        const table = body.tables.find((t: any) => t.id === 'users');
-        expect(table.fields).toHaveLength(3);
-        expect(table.fields.find((f: any) => f.id === 'email')).toBeDefined();
+        const body = JSON.parse(response.payload) as AppSchema;
+        const table = body.tables.find(t => t.id === 'users');
+        expect(table?.fields).toHaveLength(3);
+        expect(table?.fields.find(f => f.id === 'email')).toBeDefined();
         // Verify view fields were updated for matching view
-        const usersView = body.views.find((v: any) => v.id === 'usersView');
-        expect(usersView.config.fields).toContain('email');
+        const usersView = body.views.find(v => v.id === 'usersView');
+        expect(usersView?.config.fields).toContain('email');
         // Verify other table was not affected
-        const productsTable = body.tables.find((t: any) => t.id === 'products');
-        expect(productsTable.fields).toHaveLength(1);
+        const productsTable = body.tables.find(t => t.id === 'products');
+        expect(productsTable?.fields).toHaveLength(1);
     });
 
     it('should add a field to a new table with no prior fields lookup', async () => {
@@ -162,12 +162,12 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        const table = body.tables.find((t: any) => t.id === 'empty');
-        expect(table.fields).toHaveLength(1);
+        const body = JSON.parse(response.payload) as AppSchema;
+        const table = body.tables.find(t => t.id === 'empty');
+        expect(table?.fields).toHaveLength(1);
         // View should have the field added since fields.length (0) === oldFieldsLength (0)
-        const emptyView = body.views.find((v: any) => v.id === 'emptyView');
-        expect(emptyView.config.fields).toContain('id');
+        const emptyView = body.views.find(v => v.id === 'emptyView');
+        expect(emptyView?.config.fields).toContain('id');
     });
 
     it('should add a field without updating view when fields count does not match', async () => {
@@ -202,11 +202,11 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as AppSchema;
         // View should NOT have the new field since its count didn't match
-        const partialView = body.views.find((v: any) => v.id === 'partialView');
-        expect(partialView.config.fields).not.toContain('email');
-        expect(partialView.config.fields).toHaveLength(1);
+        const partialView = body.views.find(v => v.id === 'partialView');
+        expect(partialView?.config.fields).not.toContain('email');
+        expect(partialView?.config.fields).toHaveLength(1);
     });
 
     it('should add a field without updating view when view has no fields config', async () => {
@@ -241,10 +241,10 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as AppSchema;
         // View should still have no fields config
-        const noFieldsView = body.views.find((v: any) => v.id === 'noFieldsView');
-        expect(noFieldsView.config.fields).toBeUndefined();
+        const noFieldsView = body.views.find(v => v.id === 'noFieldsView');
+        expect(noFieldsView?.config.fields).toBeUndefined();
     });
 
     it('should add an action', async () => {
@@ -282,13 +282,13 @@ describe('Schema Operations', () => {
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
-        const table = body.tables.find((t: any) => t.id === 'users');
+        const table = body.tables.find(t => t.id === 'users');
 
         // seeded actions (3) + new one
         expect(table?.actions).toHaveLength(4);
         expect(table?.actions.find(a => a.id === 'export')).toBeDefined();
         // Verify other table was not affected
-        const productsTable = body.tables.find((t: any) => t.id === 'products');
+        const productsTable = body.tables.find(t => t.id === 'products');
         expect(productsTable?.actions).toHaveLength(0);
     });
 
@@ -376,11 +376,11 @@ describe('Schema Operations', () => {
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
-        const table = body.tables.find((t: any) => t.id === 'users');
+        const table = body.tables.find(t => t.id === 'users');
         expect(table?.fields[0]?.id).toBe('name');
         expect(table?.fields[1]?.id).toBe('id');
         // Verify other table's fields were not reordered
-        const productsTable = body.tables.find((t: any) => t.id === 'products');
+        const productsTable = body.tables.find(t => t.id === 'products');
         expect(productsTable?.fields[0]?.id).toBe('id');
     });
 
@@ -604,12 +604,12 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        const table = body.tables.find((t: any) => t.id === 'users');
-        expect(table.actions.find((a: any) => a.id === 'add')).toBeUndefined();
+        const body = JSON.parse(response.payload) as AppSchema;
+        const table = body.tables.find(t => t.id === 'users');
+        expect(table?.actions.find(a => a.id === 'add')).toBeUndefined();
         // Verify other table's action was not affected
-        const productsTable = body.tables.find((t: any) => t.id === 'products');
-        expect(productsTable.actions.find((a: any) => a.id === 'add')).toBeDefined();
+        const productsTable = body.tables.find(t => t.id === 'products');
+        expect(productsTable?.actions.find(a => a.id === 'add')).toBeDefined();
     });
 
     it('should reorder actions', async () => {
@@ -647,12 +647,12 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        const table = body.tables.find((t: any) => t.id === 'users');
-        expect(table.actions[0].id).toBe('delete');
+        const body = JSON.parse(response.payload) as AppSchema;
+        const table = body.tables.find(t => t.id === 'users');
+        expect(table?.actions[0]?.id).toBe('delete');
         // Verify other table's actions were not reordered
-        const productsTable = body.tables.find((t: any) => t.id === 'products');
-        expect(productsTable.actions[0].id).toBe('add');
+        const productsTable = body.tables.find(t => t.id === 'products');
+        expect(productsTable?.actions[0]?.id).toBe('add');
     });
 
     it('should reorder tables', async () => {
@@ -988,10 +988,10 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as AppSchema;
         // Orphan view should be unchanged
-        const orphanView = body.views.find((v: any) => v.id === 'orphanView');
-        expect(orphanView.config.fields).toHaveLength(0);
+        const orphanView = body.views.find(v => v.id === 'orphanView');
+        expect(orphanView?.config.fields).toHaveLength(0);
     });
 
     it('should handle adding field to parent that does not exist in tables', async () => {
@@ -1048,12 +1048,12 @@ describe('Schema Operations', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        const ghostTable = body.tables.find((t: any) => t.id === 'ghost');
-        expect(ghostTable.fields).toHaveLength(1);
+        const body = JSON.parse(response.payload) as AppSchema;
+        const ghostTable = body.tables.find(t => t.id === 'ghost');
+        expect(ghostTable?.fields).toHaveLength(1);
         // View should have the field since 0 === 0
-        const ghostView = body.views.find((v: any) => v.id === 'ghostView');
-        expect(ghostView.config.fields).toContain('id');
+        const ghostView = body.views.find(v => v.id === 'ghostView');
+        expect(ghostView?.config.fields).toContain('id');
     });
 
     it('should update a field preserving other fields in the table', async () => {

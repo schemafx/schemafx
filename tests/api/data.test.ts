@@ -14,7 +14,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 
 class LimitedConnector extends Connector {
-    private data: any[] = [];
+    private data: Record<string, unknown>[] = [];
 
     constructor() {
         super({ name: 'Limited', id: 'limited' });
@@ -146,9 +146,9 @@ describe('Data API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
         expect(body).toHaveLength(2); // Returns full list
-        expect(body.find((u: any) => u.id === 2)).toBeDefined();
+        expect(body.find(u => u.id === 2)).toBeDefined();
     });
 
     it('should validate data on create', async () => {
@@ -177,8 +177,8 @@ describe('Data API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.find((u: any) => u.id === 1).name).toBe('Updated');
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
+        expect(body.find(u => u.id === 1)?.name).toBe('Updated');
     });
 
     it('should delete data', async () => {
@@ -356,8 +356,8 @@ describe('Data API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.find((u: any) => u.id === 100)).toBeDefined();
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
+        expect(body.find(u => u.id === 100)).toBeDefined();
     });
 
     it('should handle recursion depth limit', async () => {
@@ -575,9 +575,9 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
         expect(body).toHaveLength(2);
-        expect(body.map((u: any) => u.name).sort()).toEqual(['Alice', 'Charlie']);
+        expect(body.map(u => u.name).sort()).toEqual(['Alice', 'Charlie']);
 
         const response2 = await server.inject({
             method: 'GET',

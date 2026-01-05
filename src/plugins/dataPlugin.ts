@@ -83,7 +83,7 @@ const plugin: FastifyPluginAsyncZod<{
             };
         }
 
-        const table = schema.tables.find(table => table.id === tableId);
+        const table = schema.tables.find(t => t.id === tableId);
 
         if (!table) {
             return {

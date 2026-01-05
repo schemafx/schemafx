@@ -64,7 +64,7 @@ export default class SchemaFX {
 
         this.fastifyInstance.register(fastifyCors, {
             origin: true,
-            methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
             allowedHeaders: ['Content-Type', 'Authorization'],
             ...(opts.corsOpts ?? {})
         });
@@ -126,7 +126,7 @@ export default class SchemaFX {
                 return reply
                     .status((error as unknown as Record<string, unknown>).statusCode as number)
                     .send({
-                        error: `${(error as unknown as Record<string, unknown>).error}`,
+                        error: `${(error as unknown as Record<string, unknown>).error as string}`,
                         message: (error as unknown as Record<string, unknown>).message
                     });
             }
@@ -172,10 +172,7 @@ export default class SchemaFX {
         return this.fastifyInstance.log;
     }
 
-    listen(opts?: FastifyListenOptions, callback?: (err: Error | null, address: string) => void) {
-        opts = { host: '0.0.0.0', port: 0, ...(opts ?? {}) };
-
-        if (callback) return this.fastifyInstance.listen(opts, callback);
-        return this.fastifyInstance.listen(opts);
+    listen(opts?: FastifyListenOptions) {
+        return this.fastifyInstance.listen({ host: '0.0.0.0', port: 0, ...(opts ?? {}) });
     }
 }

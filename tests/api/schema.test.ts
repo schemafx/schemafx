@@ -165,10 +165,10 @@ describe('Schema API', () => {
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
 
-        const table = body.tables.find((t: any) => t.id === 't1');
+        const table = body.tables.find(t => t.id === 't1');
         expect(table?.fields).toHaveLength(1);
 
-        const view = body.views.find((v: any) => v.id === 'v1');
+        const view = body.views.find(v => v.id === 'v1');
         expect(view?.config.fields).not.toContain('f2');
         expect(view?.config.fields).toHaveLength(1);
     });

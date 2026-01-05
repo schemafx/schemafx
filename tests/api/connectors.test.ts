@@ -13,7 +13,7 @@ class MockAuthConnector extends MemoryConnector {
         return 'http://example.com/auth';
     }
 
-    override async authorize(params: any) {
+    override async authorize(params: Record<string, unknown>) {
         return {
             name: 'Mock Connection',
             content: JSON.stringify({ token: 'mock-token', ...params })
@@ -30,7 +30,7 @@ class MockAuthConnectorWithEmail extends MemoryConnector {
         return 'http://example.com/auth/email';
     }
 
-    override async authorize(params: any) {
+    override async authorize(params: Record<string, unknown>) {
         return {
             name: 'Mock Connection With Email',
             content: JSON.stringify({ token: 'mock-token', ...params }),
@@ -74,18 +74,27 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as {
+            id: string;
+            name: string;
+            connection?: {
+                id: string;
+                name: string;
+            };
+            requiresConnection: boolean;
+            supportsData: boolean;
+        }[];
 
         // Find entries for 'mem' connector
-        const memEntries = body.filter((c: any) => c.id === 'mem');
+        const memEntries = body.filter(c => c.id === 'mem');
         expect(memEntries.length).toBeGreaterThanOrEqual(2);
 
         // One entry should be the base connector
         // And one entry for the connection we created
-        const connectionEntry = memEntries.find((c: any) => c.connection?.id === 'mem-conn-1');
+        const connectionEntry = memEntries.find(c => c.connection?.id === 'mem-conn-1');
         expect(connectionEntry).toBeDefined();
-        expect(connectionEntry.connection.name).toBe('Memory Connection 1');
-        expect(connectionEntry.requiresConnection).toBe(false);
+        expect(connectionEntry?.connection?.name).toBe('Memory Connection 1');
+        expect(connectionEntry?.requiresConnection).toBe(false);
     });
 
     it('should list tables in connector', async () => {
@@ -97,10 +106,10 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
 
         // Expect 'users' table which was seeded
-        expect(body.find((t: any) => t.name === 'users')).toBeDefined();
+        expect(body.find(t => t.name === 'users')).toBeDefined();
     });
 
     it('should 404 for unknown connector query', async () => {

@@ -9,7 +9,7 @@ class MockAuthConnectorWithEmail extends MemoryConnector {
         super({ name: 'AuthConnectorWithEmail', id: 'auth-login' });
     }
 
-    override async authorize(params: any) {
+    override async authorize(params: Record<string, unknown>) {
         return {
             name: 'Mock Login Connection',
             content: JSON.stringify({ token: 'mock-token', ...params }),
@@ -23,7 +23,7 @@ class MockAuthConnectorWithoutEmail extends MemoryConnector {
         super({ name: 'AuthConnectorWithoutEmail', id: 'auth-no-email' });
     }
 
-    override async authorize(params: any) {
+    override async authorize(params: Record<string, unknown>) {
         return {
             name: 'Mock Connection Without Email',
             content: JSON.stringify({ token: 'mock-token', ...params })

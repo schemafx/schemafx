@@ -192,12 +192,10 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            const updatedPermission = await dataService.setPermission({
+            return dataService.setPermission({
                 ...permission,
                 level
             });
-
-            return updatedPermission;
         }
     );
 

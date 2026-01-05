@@ -259,7 +259,7 @@ const plugin: FastifyPluginAsyncZod<{
                             redirect.searchParams.set(k, v);
                         }
 
-                        return reply.redirect(redirect.href, 302);
+                        return await reply.redirect(redirect.href, 302);
                     }
                 }
             } catch {}

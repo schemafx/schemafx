@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestApp, TEST_USER_EMAIL } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
-import { type AppSchema } from '../../src/index.js';
+import type { AppSchema } from '../../src/index.js';
 
 describe('Apps endpoints', () => {
     let app: SchemaFX;
@@ -114,8 +114,8 @@ describe('Apps endpoints', () => {
             headers: { Authorization: `Bearer ${token}` }
         });
         expect(listRes.statusCode).toBe(200);
-        const listBody = JSON.parse(listRes.payload);
-        expect(listBody.find((a: any) => a.id === 'app1')).toBeUndefined();
+        const listBody = JSON.parse(listRes.payload) as AppSchema[];
+        expect(listBody.find(a => a.id === 'app1')).toBeUndefined();
     });
 
     it('returns 404 when deleting a non-existent application', async () => {
