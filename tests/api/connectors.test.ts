@@ -1,19 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestApp } from '../testUtils.js';
+import { createTestApp, TEST_USER_EMAIL } from '../testUtils.js';
 import type SchemaFX from '../../src/index.js';
 import type { FastifyInstance } from 'fastify';
-import { MemoryConnector } from '../../src/index.js';
+import { MemoryConnector, PermissionLevel, PermissionTargetType } from '../../src/index.js';
 
 class MockAuthConnector extends MemoryConnector {
     constructor() {
         super({ name: 'AuthConnector', id: 'auth-conn' });
     }
 
-    async getAuthUrl() {
+    override async getAuthUrl() {
         return 'http://example.com/auth';
     }
 
-    async authorize(params: any) {
+    override async authorize(params: Record<string, unknown>) {
         return {
             name: 'Mock Connection',
             content: JSON.stringify({ token: 'mock-token', ...params })
@@ -26,11 +26,11 @@ class MockAuthConnectorWithEmail extends MemoryConnector {
         super({ name: 'AuthConnectorWithEmail', id: 'auth-conn-email' });
     }
 
-    async getAuthUrl() {
+    override async getAuthUrl() {
         return 'http://example.com/auth/email';
     }
 
-    async authorize(params: any) {
+    override async authorize(params: Record<string, unknown>) {
         return {
             name: 'Mock Connection With Email',
             content: JSON.stringify({ token: 'mock-token', ...params }),
@@ -48,7 +48,7 @@ describe('Connectors API', () => {
         const testApp = await createTestApp(true);
         app = testApp.app;
         server = app.fastifyInstance;
-        token = testApp.token;
+        token = testApp.token!;
 
         // Add mock auth connector
         app.dataService.connectors['auth-conn'] = new MockAuthConnector();
@@ -74,18 +74,27 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as {
+            id: string;
+            name: string;
+            connection?: {
+                id: string;
+                name: string;
+            };
+            requiresConnection: boolean;
+            supportsData: boolean;
+        }[];
 
         // Find entries for 'mem' connector
-        const memEntries = body.filter((c: any) => c.id === 'mem');
+        const memEntries = body.filter(c => c.id === 'mem');
         expect(memEntries.length).toBeGreaterThanOrEqual(2);
 
         // One entry should be the base connector
         // And one entry for the connection we created
-        const connectionEntry = memEntries.find((c: any) => c.connection?.id === 'mem-conn-1');
+        const connectionEntry = memEntries.find(c => c.connection?.id === 'mem-conn-1');
         expect(connectionEntry).toBeDefined();
-        expect(connectionEntry.connection.name).toBe('Memory Connection 1');
-        expect(connectionEntry.requiresConnection).toBe(false);
+        expect(connectionEntry?.connection?.name).toBe('Memory Connection 1');
+        expect(connectionEntry?.requiresConnection).toBe(false);
     });
 
     it('should list tables in connector', async () => {
@@ -97,10 +106,10 @@ describe('Connectors API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
 
         // Expect 'users' table which was seeded
-        expect(body.find((t: any) => t.name === 'users')).toBeDefined();
+        expect(body.find(t => t.name === 'users')).toBeDefined();
     });
 
     it('should 404 for unknown connector query', async () => {
@@ -132,21 +141,66 @@ describe('Connectors API', () => {
         expect(body.tables[0].name).toBe('users');
     });
 
-    it('should import table from connector to existing app', async () => {
+    it('should create admin permission for creator when creating new app', async () => {
+        // Create a new app via connector import (no appId = new app)
         const response = await server.inject({
             method: 'POST',
             url: '/api/connectors/mem/table',
             headers: { Authorization: `Bearer ${token}` },
             payload: {
-                path: ['users'],
-                appId: 'app1'
+                path: ['users']
             }
+        });
+
+        expect(response.statusCode).toBe(200);
+        const newApp = JSON.parse(response.payload);
+        expect(newApp.id).toBeDefined();
+
+        // Verify that a permission was created for the creator
+        const permissions = await app.dataService.getPermissions({
+            targetType: PermissionTargetType.App,
+            targetId: newApp.id
+        });
+
+        expect(permissions.length).toBe(1);
+        expect(permissions[0]?.email).toBe(TEST_USER_EMAIL);
+        expect(permissions[0]?.level).toBe(PermissionLevel.Admin);
+        expect(permissions[0]?.targetType).toBe(PermissionTargetType.App);
+        expect(permissions[0]?.targetId).toBe(newApp.id);
+    });
+
+    it('should import table from connector to existing app', async () => {
+        // Mock new table.
+        (app.dataService.connectors.mem as MemoryConnector).tables.set('table1', [{ id: '' }]);
+
+        const payload = {
+            path: ['table1'],
+            appId: 'app1'
+        };
+
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/connectors/mem/table',
+            headers: { Authorization: `Bearer ${token}` },
+            payload
         });
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload);
         expect(body.id).toBe('app1');
         expect(body.tables).toHaveLength(2);
+
+        const duplicateResponse = await server.inject({
+            method: 'POST',
+            url: '/api/connectors/mem/table',
+            headers: { Authorization: `Bearer ${token}` },
+            payload
+        });
+
+        // Importing the same connector + path into an existing app should fail
+        expect(duplicateResponse.statusCode).toBe(400);
+        const duplicateBody = JSON.parse(duplicateResponse.payload);
+        expect(duplicateBody.message).toBe('Table already exists in application.');
     });
 
     it('should 404 for unknown connector table', async () => {

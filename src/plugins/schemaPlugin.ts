@@ -9,7 +9,9 @@ import {
     AppTableSchema,
     AppViewSchema,
     AppFieldSchema,
-    AppActionSchema
+    AppActionSchema,
+    type AppSchema,
+    PermissionTargetType
 } from '../types.js';
 import { reorderElement, validateTableKeys } from '../utils/schemaUtils.js';
 import type DataService from '../services/DataService.js';
@@ -29,6 +31,66 @@ const plugin: FastifyPluginAsyncZod<{
         },
         async (request, reply) => {
             const schema = await dataService.getSchema(request.params.appId);
+            if (schema) return schema;
+
+            return reply.code(404).send({
+                error: 'Not Found',
+                message: 'Application not found.'
+            });
+        }
+    );
+
+    fastify.get(
+        '/apps',
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                response: {
+                    200: z.array(AppSchemaSchema),
+                    401: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const email = request.user?.email;
+
+            if (!email) {
+                return reply.code(401).send({
+                    error: 'Unauthorized',
+                    message: 'Authentication required.'
+                });
+            }
+
+            // Get all app permissions for this user
+            const userPermissions = await dataService.getPermissionsByUser(
+                email,
+                PermissionTargetType.App
+            );
+
+            // Get the app IDs the user has access to
+            const allowedAppIds = new Set(userPermissions.map(p => p.targetId));
+
+            // Get all apps and filter by permission
+            const allApps = (await dataService.getData(dataService.schemaTable)) as AppSchema[];
+            return allApps.filter(app => allowedAppIds.has(app.id));
+        }
+    );
+
+    fastify.delete(
+        '/apps/:appId',
+        {
+            onRequest: [fastify.authenticate],
+            schema: {
+                params: z.object({ appId: z.string().min(1) }),
+                response: {
+                    200: z.object({ success: z.boolean() }),
+                    404: ErrorResponseSchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const { appId } = request.params;
+            const schema = await dataService.getSchema(appId);
 
             if (!schema) {
                 return reply.code(404).send({
@@ -37,7 +99,8 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            return schema;
+            await dataService.deleteSchema(appId);
+            return { success: true };
         }
     );
 
@@ -348,7 +411,7 @@ const plugin: FastifyPluginAsyncZod<{
                     break;
             }
 
-            return dataService.setSchema(schema);
+            return dataService.setSchema(schema, request.user?.email);
         }
     );
 };

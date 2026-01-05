@@ -8,7 +8,7 @@ import {
     zodFromFields,
     zodFromTable
 } from '../../src/utils/zodUtils.js';
-import { AppFieldType, AppTableSchema, type AppTable, type AppField } from '../../src/types.js';
+import { AppFieldType, AppTableSchema, type AppTable } from '../../src/types.js';
 
 describe('zodUtils', () => {
     describe('zodFromField', () => {
@@ -94,7 +94,7 @@ describe('zodUtils', () => {
                 type: AppFieldType.Email
             });
 
-            expect(schema.safeParse('test@example.com').success).toBe(true);
+            expect(schema.safeParse('test@schemafx.com').success).toBe(true);
             expect(schema.safeParse('invalid').success).toBe(false);
         });
 
@@ -414,7 +414,7 @@ describe('zodUtils', () => {
             const listObj = table.fields.find(f => f.id === 'list_of_objects');
             expect(listObj?.type).toBe(AppFieldType.List);
             expect(listObj?.child?.type).toBe(AppFieldType.JSON);
-            expect(listObj?.child?.fields?.[0].id).toBe('item');
+            expect(listObj?.child?.fields?.[0]?.id).toBe('item');
         });
 
         it('should throw error if primary key is missing', () => {

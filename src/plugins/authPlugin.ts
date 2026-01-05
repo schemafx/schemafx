@@ -44,12 +44,15 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            const connection = await dataService.setConnection({
-                id: randomUUID(),
-                connector: connector.id,
-                name: authResult.name,
-                content: authResult.content
-            });
+            const connection = await dataService.setConnection(
+                {
+                    id: randomUUID(),
+                    connector: connector.id,
+                    name: authResult.name,
+                    content: authResult.content
+                },
+                authResult.email
+            );
 
             return {
                 token: fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' }),

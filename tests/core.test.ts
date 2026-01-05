@@ -11,9 +11,14 @@ declare module 'fastify' {
 
 declare module '@fastify/jwt' {
     interface FastifyJWT {
-        payload: { id: string };
-        user: { id: string };
+        payload: { email: string };
+        user: { email: string };
     }
+}
+
+interface CustomError extends Error {
+    code?: string;
+    validation?: { field: string; message: string }[];
 }
 
 describe('Core SchemaFX', () => {
@@ -28,6 +33,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -48,6 +57,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
@@ -81,6 +94,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
@@ -131,6 +148,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             },
             corsOpts: { origin: false },
@@ -176,6 +197,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -200,6 +225,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -220,6 +249,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -242,17 +275,16 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
 
-        await new Promise<void>((resolve, reject) => {
-            app.listen({ port: 0 }, (err, address) => {
-                if (err) reject(err);
-                expect(address).toBeDefined();
-                resolve();
-            });
-        });
+        const address = await app.listen({ port: 0 });
+        expect(address).toBeDefined();
 
         await app.fastifyInstance.close();
     });
@@ -268,6 +300,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -305,6 +341,10 @@ describe('Core SchemaFX', () => {
                 connectionsConnector: {
                     connector: 'mem',
                     path: ['connections']
+                },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
                 },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
@@ -360,7 +400,7 @@ describe('Core SchemaFX', () => {
         const server = app.fastifyInstance;
 
         server.get('/fastify-validation-error', async () => {
-            const error: any = new Error('Fastify Validation Error');
+            const error: CustomError = new Error('Fastify Validation Error');
             error.validation = [{ field: 'test', message: 'invalid' }];
             throw error;
         });
@@ -385,7 +425,7 @@ describe('Core SchemaFX', () => {
         const server = app.fastifyInstance;
 
         server.get('/fst-validation-error', async () => {
-            const error: any = new Error('Manual Validation Error');
+            const error: CustomError = new Error('Manual Validation Error');
             error.code = 'FST_ERR_VALIDATION';
             throw error;
         });
@@ -417,6 +457,10 @@ describe('Core SchemaFX', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [new MemoryConnector({ name: 'Mem', id: 'mem' })]
             }
         });
@@ -425,12 +469,12 @@ describe('Core SchemaFX', () => {
         // Add a route that uses the 'authenticate' decorator
         server.get('/protected-valid', { onRequest: [server.authenticate] }, async req => {
             // If jwtVerify passes, req.user should be populated
-            return { user: (req as any).user };
+            return { user: req.user };
         });
 
         await server.ready();
 
-        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
+        const token = app.fastifyInstance.jwt.sign({ email: 'dev@schemafx.com' });
 
         const response = await server.inject({
             method: 'GET',

@@ -2,8 +2,11 @@ import SchemaFX, {
     AppActionType,
     AppFieldType,
     type AppSchema,
-    MemoryConnector
+    MemoryConnector,
+    type AppTable
 } from '../src/index.js';
+
+export const TEST_USER_EMAIL = 'test@schemafx.com';
 
 export async function createTestApp(includeToken?: boolean, opts?: { encryptionKey?: string }) {
     const connector = new MemoryConnector({ name: 'Memory', id: 'mem' });
@@ -52,34 +55,33 @@ export async function createTestApp(includeToken?: boolean, opts?: { encryptionK
                 connector: 'mem',
                 path: ['connections']
             },
+            permissionsConnector: {
+                connector: 'mem',
+                path: ['permissions']
+            },
             connectors: [connector],
             encryptionKey: opts?.encryptionKey
         }
     });
 
-    await app.dataService.setSchema(schema);
+    await app.dataService.setSchema(schema, TEST_USER_EMAIL);
     await app.dataService.executeAction({
-        table: schema.tables[0],
+        table: schema.tables[0] as AppTable,
         actId: 'add',
         rows: [{ id: 1, name: 'User 1' }]
     });
 
+    // Create a signed JWT token directly for the test user
+    // Only call ready() when we need to sign tokens - otherwise tests can add routes first
+    let token: string | undefined;
+    if (includeToken) {
+        await app.fastifyInstance.ready();
+        token = app.fastifyInstance.jwt.sign({ email: TEST_USER_EMAIL }, { expiresIn: '1h' });
+    }
+
     return {
         app,
         connector,
-        token: includeToken
-            ? JSON.parse(
-                  (
-                      await app.fastifyInstance.inject({
-                          method: 'POST',
-                          url: '/api/login',
-                          payload: {
-                              username: 'test',
-                              password: 'test'
-                          }
-                      })
-                  ).payload
-              ).token
-            : undefined
+        token
     };
 }

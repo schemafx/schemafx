@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestApp } from './testUtils.js';
+import { describe, it, expect } from 'vitest';
+import { createTestApp, TEST_USER_EMAIL } from './testUtils.js';
 import { encrypt, decrypt } from '../src/utils/encryption.js';
 import { AppFieldType, AppActionType } from '../src/types.js';
 
@@ -38,32 +38,40 @@ describe('Encrypted Fields Integration', () => {
         });
 
         // Setup schema with encrypted fields
-        await app.dataService.setSchema({
-            id: 'enc-app',
-            name: 'Encrypted App',
-            tables: [
-                {
-                    id: 'secrets',
-                    name: 'Secrets',
-                    connector: connector.id,
-                    path: ['secrets'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'secret', name: 'Secret', type: AppFieldType.Text, encrypted: true },
-                        {
-                            id: 'confidential',
-                            name: 'Confidential',
-                            type: AppFieldType.JSON,
-                            encrypted: true,
-                            fields: [{ id: 'code', name: 'Code', type: AppFieldType.Number }]
-                        },
-                        { id: 'public', name: 'Public', type: AppFieldType.Text }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'enc-app',
+                name: 'Encrypted App',
+                tables: [
+                    {
+                        id: 'secrets',
+                        name: 'Secrets',
+                        connector: connector.id,
+                        path: ['secrets'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            {
+                                id: 'secret',
+                                name: 'Secret',
+                                type: AppFieldType.Text,
+                                encrypted: true
+                            },
+                            {
+                                id: 'confidential',
+                                name: 'Confidential',
+                                type: AppFieldType.JSON,
+                                encrypted: true,
+                                fields: [{ id: 'code', name: 'Code', type: AppFieldType.Number }]
+                            },
+                            { id: 'public', name: 'Public', type: AppFieldType.Text }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const server = app.fastifyInstance;
 
@@ -89,11 +97,11 @@ describe('Encrypted Fields Integration', () => {
         expect(storedData).toHaveLength(1);
 
         const row = storedData[0];
-        expect(row.secret).not.toBe('MySecretValue');
-        expect(row.secret).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
-        expect(row.confidential).not.toEqual({ code: 1234 });
-        expect(typeof row.confidential).toBe('string');
-        expect(row.public).toBe('PublicValue');
+        expect(row?.secret).not.toBe('MySecretValue');
+        expect(row?.secret).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+        expect(row?.confidential).not.toEqual({ code: 1234 });
+        expect(typeof row?.confidential).toBe('string');
+        expect(row?.public).toBe('PublicValue');
 
         const response = await server.inject({
             method: 'GET',
@@ -115,24 +123,32 @@ describe('Encrypted Fields Integration', () => {
     it('should handle missing encryption key gracefully (store plain?) or throw?', async () => {
         const { app, connector, token } = await createTestApp(true);
 
-        await app.dataService.setSchema({
-            id: 'plain-app',
-            name: 'Plain App',
-            tables: [
-                {
-                    id: 'secrets',
-                    name: 'Secrets',
-                    connector: connector.id,
-                    path: ['secrets'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'secret', name: 'Secret', type: AppFieldType.Text, encrypted: true }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'plain-app',
+                name: 'Plain App',
+                tables: [
+                    {
+                        id: 'secrets',
+                        name: 'Secrets',
+                        connector: connector.id,
+                        path: ['secrets'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            {
+                                id: 'secret',
+                                name: 'Secret',
+                                type: AppFieldType.Text,
+                                encrypted: true
+                            }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const server = app.fastifyInstance;
 
@@ -148,7 +164,7 @@ describe('Encrypted Fields Integration', () => {
 
         const storedData = connector.tables.get('secrets') ?? [];
 
-        expect(storedData[0].secret).toBe('MySecretValue'); // Not encrypted because no key
+        expect(storedData[0]?.secret).toBe('MySecretValue'); // Not encrypted because no key
 
         await server.close();
     });
@@ -158,25 +174,28 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        await app.dataService.setSchema({
-            id: 'falsy-app',
-            name: 'Falsy App',
-            tables: [
-                {
-                    id: 'data',
-                    name: 'Data',
-                    connector: connector.id,
-                    path: ['data'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'flag', name: 'Flag', type: AppFieldType.JSON, encrypted: true },
-                        { id: 'zero', name: 'Zero', type: AppFieldType.JSON, encrypted: true }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'falsy-app',
+                name: 'Falsy App',
+                tables: [
+                    {
+                        id: 'data',
+                        name: 'Data',
+                        connector: connector.id,
+                        path: ['data'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            { id: 'flag', name: 'Flag', type: AppFieldType.JSON, encrypted: true },
+                            { id: 'zero', name: 'Zero', type: AppFieldType.JSON, encrypted: true }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const server = app.fastifyInstance;
 
@@ -200,10 +219,10 @@ describe('Encrypted Fields Integration', () => {
 
         const storedData = connector.tables.get('data') ?? [];
 
-        expect(storedData[0].flag).not.toBe(false);
-        expect(storedData[0].flag).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
-        expect(storedData[0].zero).not.toBe(0);
-        expect(storedData[0].zero).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+        expect(storedData[0]?.flag).not.toBe(false);
+        expect(storedData[0]?.flag).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+        expect(storedData[0]?.zero).not.toBe(0);
+        expect(storedData[0]?.zero).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
 
         const response = await server.inject({
             method: 'GET',
@@ -223,24 +242,32 @@ describe('Encrypted Fields Integration', () => {
             encryptionKey
         });
 
-        await app.dataService.setSchema({
-            id: 'error-app',
-            name: 'Error App',
-            tables: [
-                {
-                    id: 'secrets',
-                    name: 'Secrets',
-                    connector: connector.id,
-                    path: ['secrets'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
-                        { id: 'secret', name: 'Secret', type: AppFieldType.Text, encrypted: true }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'error-app',
+                name: 'Error App',
+                tables: [
+                    {
+                        id: 'secrets',
+                        name: 'Secrets',
+                        connector: connector.id,
+                        path: ['secrets'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Text, isKey: true },
+                            {
+                                id: 'secret',
+                                name: 'Secret',
+                                type: AppFieldType.Text,
+                                encrypted: true
+                            }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         await connector.addRow!(
             {

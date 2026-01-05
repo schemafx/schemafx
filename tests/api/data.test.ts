@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestApp } from '../testUtils.js';
+import { createTestApp, TEST_USER_EMAIL } from '../testUtils.js';
 import SchemaFX from '../../src/index.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
 import {
@@ -14,7 +14,7 @@ import {
 import type { FastifyInstance } from 'fastify';
 
 class LimitedConnector extends Connector {
-    private data: any[] = [];
+    private data: Record<string, unknown>[] = [];
 
     constructor() {
         super({ name: 'Limited', id: 'limited' });
@@ -29,7 +29,7 @@ class LimitedConnector extends Connector {
         return [];
     }
 
-    async getTable(path: string[]): Promise<AppTable> {
+    async getTable(): Promise<AppTable> {
         return {
             id: 't1',
             name: 'T1',
@@ -47,12 +47,12 @@ class LimitedConnector extends Connector {
         };
     }
 
-    async getCapabilities() {
+    override async getCapabilities() {
         // Return NO capabilities (no filter, no limit, no offset)
         return {};
     }
 
-    async getData(): Promise<DataSourceDefinition> {
+    override async getData(): Promise<DataSourceDefinition> {
         return {
             type: DataSourceType.Inline,
             data: [...this.data]
@@ -71,7 +71,7 @@ describe('Data API', () => {
         app = testApp.app;
         connector = testApp.connector;
         server = app.fastifyInstance;
-        token = testApp.token;
+        token = testApp.token!;
     });
 
     afterEach(async () => {
@@ -91,7 +91,7 @@ describe('Data API', () => {
         expect(body[0].id).toBe(1);
     });
 
-    it('should 404 for unknown application', async () => {
+    it('should 403 for unknown application (no permission)', async () => {
         const response = await server.inject({
             method: 'POST',
             url: '/api/apps/app2/data/users',
@@ -102,7 +102,7 @@ describe('Data API', () => {
             }
         });
 
-        expect(response.statusCode).toBe(404);
+        expect(response.statusCode).toBe(403);
     });
 
     it('should filter data', async () => {
@@ -146,9 +146,9 @@ describe('Data API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
         expect(body).toHaveLength(2); // Returns full list
-        expect(body.find((u: any) => u.id === 2)).toBeDefined();
+        expect(body.find(u => u.id === 2)).toBeDefined();
     });
 
     it('should validate data on create', async () => {
@@ -177,8 +177,8 @@ describe('Data API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.find((u: any) => u.id === 1).name).toBe('Updated');
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
+        expect(body.find(u => u.id === 1)?.name).toBe('Updated');
     });
 
     it('should delete data', async () => {
@@ -198,34 +198,37 @@ describe('Data API', () => {
     });
 
     it('should handle recursive relationship max depth', async () => {
-        await app.dataService.setSchema({
-            id: 'tree',
-            name: 'Tree',
-            tables: [
-                {
-                    id: 'nodes',
-                    name: 'Nodes',
-                    connector: connector.id,
-                    path: ['nodes'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Text,
-                            isKey: true
-                        },
-                        {
-                            id: 'parent',
-                            name: 'Parent',
-                            type: AppFieldType.Reference,
-                            referenceTo: 'nodes'
-                        }
-                    ],
-                    actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'tree',
+                name: 'Tree',
+                tables: [
+                    {
+                        id: 'nodes',
+                        name: 'Nodes',
+                        connector: connector.id,
+                        path: ['nodes'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Text,
+                                isKey: true
+                            },
+                            {
+                                id: 'parent',
+                                name: 'Parent',
+                                type: AppFieldType.Reference,
+                                referenceTo: 'nodes'
+                            }
+                        ],
+                        actions: [{ id: 'add', name: 'Add', type: AppActionType.Add }]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         await server.inject({
             method: 'POST',
@@ -260,28 +263,31 @@ describe('Data API', () => {
     });
 
     it('should handle invalid connector', async () => {
-        await app.dataService.setSchema({
-            id: 'bad-connector-app',
-            name: 'Bad App',
-            tables: [
-                {
-                    id: 't1',
-                    name: 'T1',
-                    connector: 'missing-connector',
-                    path: ['t1'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Text,
-                            isKey: true
-                        }
-                    ],
-                    actions: []
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'bad-connector-app',
+                name: 'Bad App',
+                tables: [
+                    {
+                        id: 't1',
+                        name: 'T1',
+                        connector: 'missing-connector',
+                        path: ['t1'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Text,
+                                isKey: true
+                            }
+                        ],
+                        actions: []
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const response = await server.inject({
             method: 'GET',
@@ -296,45 +302,48 @@ describe('Data API', () => {
     });
 
     it('should handle nested actions (Process type)', async () => {
-        await app.dataService.setSchema({
-            id: 'process-app',
-            name: 'Process App',
-            tables: [
-                {
-                    id: 'users',
-                    name: 'Users',
-                    connector: connector.id,
-                    path: ['users'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Number,
-                            isKey: true
-                        },
-                        {
-                            id: 'name',
-                            name: 'Name',
-                            type: AppFieldType.Text
-                        }
-                    ],
-                    actions: [
-                        {
-                            id: 'add',
-                            name: 'Add',
-                            type: AppActionType.Add
-                        },
-                        {
-                            id: 'addWrapper',
-                            name: 'Add Wrapper',
-                            type: AppActionType.Process,
-                            config: { actions: ['add'] }
-                        }
-                    ]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'process-app',
+                name: 'Process App',
+                tables: [
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        connector: connector.id,
+                        path: ['users'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Number,
+                                isKey: true
+                            },
+                            {
+                                id: 'name',
+                                name: 'Name',
+                                type: AppFieldType.Text
+                            }
+                        ],
+                        actions: [
+                            {
+                                id: 'add',
+                                name: 'Add',
+                                type: AppActionType.Add
+                            },
+                            {
+                                id: 'addWrapper',
+                                name: 'Add Wrapper',
+                                type: AppActionType.Process,
+                                config: { actions: ['add'] }
+                            }
+                        ]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const response = await server.inject({
             method: 'POST',
@@ -347,40 +356,43 @@ describe('Data API', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
-        expect(body.find((u: any) => u.id === 100)).toBeDefined();
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
+        expect(body.find(u => u.id === 100)).toBeDefined();
     });
 
     it('should handle recursion depth limit', async () => {
-        await app.dataService.setSchema({
-            id: 'recursion-app',
-            name: 'Recursion App',
-            tables: [
-                {
-                    id: 'users',
-                    name: 'Users',
-                    connector: connector.id,
-                    path: ['users'],
-                    fields: [
-                        {
-                            id: 'id',
-                            name: 'ID',
-                            type: AppFieldType.Number,
-                            isKey: true
-                        }
-                    ],
-                    actions: [
-                        {
-                            id: 'infinite',
-                            name: 'Infinite',
-                            type: AppActionType.Process,
-                            config: { actions: ['infinite'] }
-                        }
-                    ]
-                }
-            ],
-            views: []
-        });
+        await app.dataService.setSchema(
+            {
+                id: 'recursion-app',
+                name: 'Recursion App',
+                tables: [
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        connector: connector.id,
+                        path: ['users'],
+                        fields: [
+                            {
+                                id: 'id',
+                                name: 'ID',
+                                type: AppFieldType.Number,
+                                isKey: true
+                            }
+                        ],
+                        actions: [
+                            {
+                                id: 'infinite',
+                                name: 'Infinite',
+                                type: AppActionType.Process,
+                                config: { actions: ['infinite'] }
+                            }
+                        ]
+                    }
+                ],
+                views: []
+            },
+            TEST_USER_EMAIL
+        );
 
         const response = await server.inject({
             method: 'POST',
@@ -395,6 +407,107 @@ describe('Data API', () => {
         expect(response.statusCode).toBe(500);
         const body = JSON.parse(response.payload);
         expect(body.error).toBe('Internal Server Error');
+    });
+
+    it('should return 401 for unauthenticated GET request', async () => {
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/app1/data/users'
+        });
+
+        expect(response.statusCode).toBe(401);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Unauthorized');
+    });
+
+    it('should return 401 for unauthenticated POST request', async () => {
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/app1/data/users',
+            payload: {
+                actionId: 'add',
+                rows: [{ id: 2, name: 'User 2' }]
+            }
+        });
+
+        expect(response.statusCode).toBe(401);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Unauthorized');
+    });
+
+    it('should return 403 for non-existent application (no permission)', async () => {
+        // When accessing a non-existent app, permission check happens first
+        // Since user has no permission for the app, 403 is returned (security best practice)
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/nonexistent/data/users',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        expect(response.statusCode).toBe(403);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Forbidden');
+    });
+
+    it('should return 404 for app with permission but missing schema', async () => {
+        // To trigger the 404 code path, we need to grant permission first
+        // then access an app where schema lookup fails
+        // First create a permission for a non-existent app
+        await server.inject({
+            method: 'POST',
+            url: '/api/permissions',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                targetType: 'app',
+                targetId: 'ghost-app',
+                email: 'test@schemafx.com',
+                level: 'read'
+            }
+        });
+
+        // Now access the app - permission check passes, but schema doesn't exist
+        const response = await server.inject({
+            method: 'GET',
+            url: '/api/apps/ghost-app/data/users',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        expect(response.statusCode).toBe(404);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Not Found');
+        expect(body.message).toBe('Application not found.');
+    });
+
+    it('should return 404 for POST on app with permission but missing schema', async () => {
+        // To trigger the 404 code path on POST, we need to grant permission first
+        // then try to post data to an app where schema lookup fails
+        await server.inject({
+            method: 'POST',
+            url: '/api/permissions',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                targetType: 'app',
+                targetId: 'ghost-app-post',
+                email: 'test@schemafx.com',
+                level: 'write'
+            }
+        });
+
+        // Now POST to the app - permission check passes, but schema doesn't exist
+        const response = await server.inject({
+            method: 'POST',
+            url: '/api/apps/ghost-app-post/data/users',
+            headers: { Authorization: `Bearer ${token}` },
+            payload: {
+                actionId: 'add',
+                rows: [{ id: 1, name: 'Test' }]
+            }
+        });
+
+        expect(response.statusCode).toBe(404);
+        const body = JSON.parse(response.payload);
+        expect(body.error).toBe('Not Found');
+        expect(body.message).toBe('Application not found.');
     });
 });
 
@@ -414,13 +527,18 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
                     connector: 'mem',
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: 'mem',
+                    path: ['permissions']
+                },
                 connectors: [memConnector, limitedConnector]
             }
         });
 
         const server = app.fastifyInstance;
         await server.ready();
-        const token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
+        const testEmail = 'dev@schemafx.com';
+        const token = app.fastifyInstance.jwt.sign({ email: testEmail });
 
         const schema = {
             id: 'limited-app',
@@ -442,11 +560,11 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
             views: []
         };
 
-        await app.dataService.setSchema(schema);
+        await app.dataService.setSchema(schema, testEmail);
 
         const response = await server.inject({
             method: 'GET',
-            url: `/api/apps/${schema.id}/data/${schema.tables[0].id}?query=${encodeURIComponent(
+            url: `/api/apps/${schema.id}/data/${schema.tables[0]?.id}?query=${encodeURIComponent(
                 JSON.stringify({
                     filters: [
                         { field: 'age', operator: QueryFilterOperator.GreaterThan, value: 28 }
@@ -457,13 +575,13 @@ describe('Data API Manual Filtering (Limited Connector)', () => {
         });
 
         expect(response.statusCode).toBe(200);
-        const body = JSON.parse(response.payload);
+        const body = JSON.parse(response.payload) as Record<string, unknown>[];
         expect(body).toHaveLength(2);
-        expect(body.map((u: any) => u.name).sort()).toEqual(['Alice', 'Charlie']);
+        expect(body.map(u => u.name).sort()).toEqual(['Alice', 'Charlie']);
 
         const response2 = await server.inject({
             method: 'GET',
-            url: `/api/apps/${schema.id}/data/${schema.tables[0].id}?query=${encodeURIComponent(
+            url: `/api/apps/${schema.id}/data/${schema.tables[0]?.id}?query=${encodeURIComponent(
                 JSON.stringify({
                     filters: [
                         { field: 'age', operator: QueryFilterOperator.GreaterThan, value: 20 }

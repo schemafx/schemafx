@@ -3,6 +3,7 @@ import authPlugin from './authPlugin.js';
 import connectorsPlugin from './connectorsPlugin.js';
 import schemaPlugin from './schemaPlugin.js';
 import dataPlugin from './dataPlugin.js';
+import permissionsPlugin from './permissionsPlugin.js';
 import type DataService from '../services/DataService.js';
 
 const plugin: FastifyPluginAsyncZod<{ dataService: DataService }> = async (
@@ -13,6 +14,7 @@ const plugin: FastifyPluginAsyncZod<{ dataService: DataService }> = async (
     fastify.register(connectorsPlugin, { dataService });
     fastify.register(schemaPlugin, { dataService });
     fastify.register(dataPlugin, { dataService });
+    fastify.register(permissionsPlugin, { dataService });
 };
 
 export default plugin;

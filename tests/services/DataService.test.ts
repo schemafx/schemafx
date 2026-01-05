@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import DataService, { DataServiceOptions } from '../../src/services/DataService.js';
+import DataService, { type DataServiceOptions } from '../../src/services/DataService.js';
 import MemoryConnector from '../../src/connectors/memoryConnector.js';
-import { AppActionType, AppFieldType, type AppSchema, Connector } from '../../src/types.js';
+import {
+    AppActionType,
+    AppFieldType,
+    type AppSchema,
+    type AppTable,
+    Connector,
+    QueryFilterOperator
+} from '../../src/types.js';
 
 describe('DataService', () => {
     let dataService: DataService;
@@ -18,6 +25,10 @@ describe('DataService', () => {
             connectionsConnector: {
                 connector: connector.id,
                 path: ['connections']
+            },
+            permissionsConnector: {
+                connector: connector.id,
+                path: ['permissions']
             },
             connectors: [connector]
         };
@@ -57,12 +68,12 @@ describe('DataService', () => {
             const ds = new DataService(customOptions);
 
             // Access private properties by casting to any for testing purposes
-            expect((ds.schemaCache as any).max).toBe(10);
-            expect((ds.schemaCache as any).ttl).toBe(1000);
-            expect((ds.connectionsCache as any).max).toBe(20);
-            expect((ds.connectionsCache as any).ttl).toBe(2000);
-            expect((ds.validatorCache as any).max).toBe(30);
-            expect((ds.validatorCache as any).ttl).toBe(3000);
+            expect(ds.schemaCache.max).toBe(10);
+            expect(ds.schemaCache.ttl).toBe(1000);
+            expect(ds.connectionsCache.max).toBe(20);
+            expect(ds.connectionsCache.ttl).toBe(2000);
+            expect(ds.validatorCache.max).toBe(30);
+            expect(ds.validatorCache.ttl).toBe(3000);
             expect(ds.maxRecursiveDepth).toBe(50);
             expect(ds.encryptionKey).toBe('test-key');
         });
@@ -127,7 +138,7 @@ describe('DataService', () => {
             expect(dataService.connectionsCache.has('delete-test')).toBe(false);
 
             // Verify connection was deleted from the connector
-            const connectorData = connector.tables.get(dataService.connectionsTable.path[0]) ?? [];
+            const connectorData = connector.tables.get(dataService.connectionsTable.path[0]!) ?? [];
             expect(connectorData.find(c => c.id === 'delete-test')).toBeUndefined();
 
             const fetched = await dataService.getConnection('delete-test');
@@ -185,7 +196,7 @@ describe('DataService', () => {
     });
 
     describe('Actions & Data', () => {
-        const table: any = {
+        const table: AppTable = {
             id: 'users',
             name: 'Users',
             connector: 'mem',
@@ -344,11 +355,11 @@ describe('DataService', () => {
             // DuckDB uses strict filtering logic.
             // We need to import QueryFilterOperator in test file
             const data = await dataService.getData(table, {
-                filters: [{ field: 'name', operator: 'eq' as any, value: 'Bob' }]
+                filters: [{ field: 'name', operator: QueryFilterOperator.Equals, value: 'Bob' }]
             });
 
             expect(data).toHaveLength(1);
-            expect(data[0].name).toBe('Bob');
+            expect(data[0]?.name).toBe('Bob');
         });
 
         it('should limit data', async () => {
@@ -385,20 +396,23 @@ describe('DataService', () => {
                     connector: minimalConnector.id,
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: minimalConnector.id,
+                    path: ['permissions']
+                },
                 connectors: [minimalConnector]
             };
 
             const ds = new DataService(minimalOptions);
 
-            const table: any = {
+            const data = await ds.getData({
                 id: 'test-table',
                 name: 'Test Table',
                 connector: minimalConnector.id,
                 path: ['test'],
-                fields: [{ id: 'id', name: 'ID', type: AppFieldType.Number, isKey: true }]
-            };
-
-            const data = await ds.getData(table);
+                fields: [{ id: 'id', name: 'ID', type: AppFieldType.Number, isKey: true }],
+                actions: []
+            });
             expect(data).toEqual([]);
         });
     });

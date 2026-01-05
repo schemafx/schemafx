@@ -9,14 +9,26 @@ import {
     AppSchemaSchema,
     QueryFilterOperator,
     AppConnectionSchema,
-    type AppConnection
+    type AppConnection,
+    AppPermissionSchema,
+    type AppPermission,
+    PermissionLevel
 } from '../types.js';
+import { PermissionTargetType } from '../types.js';
 import type { z } from 'zod';
 import { type AppTableFromZodOptions, tableFromZod, zodFromTable } from '../utils/zodUtils.js';
 import { getData as getDuckDBData } from '../utils/duckdb.js';
 import { extractKeys } from '../utils/schemaUtils.js';
 import { decodeRow, encodeRow } from '../utils/dataUtils.js';
 import { randomUUID } from 'crypto';
+
+/**
+ * Permission target for querying permissions.
+ */
+export type PermissionTarget = {
+    targetType: PermissionTargetType;
+    targetId: string;
+};
 
 type executeActionOptions = {
     table: AppTable;
@@ -29,6 +41,11 @@ export type DataServiceOptions = {
     schemaConnector: Omit<AppTableFromZodOptions, 'id' | 'name' | 'primaryKey'>;
     connectionsConnection?: string;
     connectionsConnector: Omit<
+        AppTableFromZodOptions,
+        'id' | 'name' | 'primaryKey' | 'connectionId'
+    >;
+    permissionsConnection?: string;
+    permissionsConnector: Omit<
         AppTableFromZodOptions,
         'id' | 'name' | 'primaryKey' | 'connectionId'
     >;
@@ -57,6 +74,8 @@ export default class DataService {
     schemaTable: AppTable;
     connectionsConnection?: string;
     connectionsTable: AppTable;
+    permissionsConnection?: string;
+    permissionsTable: AppTable;
 
     connectors: Record<string, Connector> = {};
     encryptionKey?: string;
@@ -70,6 +89,8 @@ export default class DataService {
         schemaConnector,
         connectionsConnection,
         connectionsConnector,
+        permissionsConnection,
+        permissionsConnector,
 
         connectors,
         maxRecursiveDepth,
@@ -151,6 +172,31 @@ export default class DataService {
             this.connectionsTable.fields.findIndex(f => f.id === 'content')
         ]!.encrypted = true;
 
+        this.permissionsConnection = permissionsConnection;
+        this.permissionsTable = tableFromZod(AppPermissionSchema, {
+            id: randomUUID(),
+            name: '',
+            primaryKey: 'id',
+            ...permissionsConnector,
+            actions: [
+                {
+                    id: 'add',
+                    name: '',
+                    type: AppActionType.Add
+                },
+                {
+                    id: 'update',
+                    name: '',
+                    type: AppActionType.Update
+                },
+                {
+                    id: 'delete',
+                    name: '',
+                    type: AppActionType.Delete
+                }
+            ]
+        });
+
         this.encryptionKey = encryptionKey;
         this.maxRecursiveDepth = maxRecursiveDepth ?? 100;
     }
@@ -184,7 +230,7 @@ export default class DataService {
         )) as AppConnection[];
     }
 
-    async setConnection(connection: AppConnection) {
+    async setConnection(connection: AppConnection, owner?: string) {
         const existingConnection = await this.getConnection(connection.id);
         this.connectionsCache.set(connection.id, connection);
 
@@ -194,6 +240,16 @@ export default class DataService {
             actId: existingConnection ? 'update' : 'add',
             rows: [connection]
         });
+
+        if (!existingConnection && owner) {
+            await this.setPermission({
+                id: randomUUID(),
+                targetType: PermissionTargetType.Connection,
+                targetId: connection.id,
+                email: owner.toLowerCase(),
+                level: PermissionLevel.Admin
+            });
+        }
 
         return connection;
     }
@@ -210,6 +266,182 @@ export default class DataService {
         });
 
         return this.connectionsCache.delete(connectionId);
+    }
+
+    // ========================================================================
+    // Permission Methods
+    // ========================================================================
+
+    /**
+     * Get all permissions for a target (app, connection, etc.).
+     * @param target The permission target (targetType and targetId)
+     * @returns Array of permissions
+     */
+    async getPermissions(target: PermissionTarget): Promise<AppPermission[]> {
+        return (await this._getData(this.permissionsTable, this.permissionsConnection, {
+            filters: [
+                {
+                    field: 'targetType',
+                    operator: QueryFilterOperator.Equals,
+                    value: target.targetType
+                },
+                {
+                    field: 'targetId',
+                    operator: QueryFilterOperator.Equals,
+                    value: target.targetId
+                }
+            ]
+        })) as AppPermission[];
+    }
+
+    /**
+     * Get a specific permission by ID.
+     * @param permissionId Permission ID
+     * @returns The permission or undefined
+     */
+    async getPermission(permissionId: string): Promise<AppPermission | undefined> {
+        const permissions = (await this._getData(
+            this.permissionsTable,
+            this.permissionsConnection,
+            {
+                filters: [
+                    {
+                        field: 'id',
+                        operator: QueryFilterOperator.Equals,
+                        value: permissionId
+                    }
+                ],
+                limit: 1
+            }
+        )) as AppPermission[];
+
+        return permissions[0];
+    }
+
+    /**
+     * Get permission for a specific user on a target.
+     * @param target The permission target (targetType and targetId)
+     * @param email User email
+     * @returns The permission or undefined
+     */
+    async getUserPermission(
+        target: PermissionTarget,
+        email: string
+    ): Promise<AppPermission | undefined> {
+        const permissions = await this.getPermissions(target);
+        return permissions.find(p => p.email.toLowerCase() === email.toLowerCase());
+    }
+
+    /**
+     * Get all permissions for a user by email.
+     * @param email User email
+     * @param targetType Optional filter by target type
+     * @returns Array of permissions the user has
+     */
+    async getPermissionsByUser(
+        email: string,
+        targetType?: PermissionTargetType
+    ): Promise<AppPermission[]> {
+        const filters = [
+            {
+                field: 'email',
+                operator: QueryFilterOperator.Equals,
+                value: email.toLowerCase()
+            }
+        ];
+
+        if (targetType) {
+            filters.push({
+                field: 'targetType',
+                operator: QueryFilterOperator.Equals,
+                value: targetType
+            });
+        }
+
+        return (await this._getData(this.permissionsTable, this.permissionsConnection, {
+            filters
+        })) as AppPermission[];
+    }
+
+    /**
+     * Check if a user has at least the specified permission level on a target.
+     * @param target The permission target (targetType and targetId)
+     * @param email User email
+     * @param requiredLevel Required permission level
+     * @returns True if user has sufficient permissions
+     */
+    async hasPermission(
+        target: PermissionTarget,
+        email: string,
+        requiredLevel: PermissionLevel
+    ): Promise<boolean> {
+        const permission = await this.getUserPermission(target, email);
+        if (!permission) return false;
+
+        const levelOrder = {
+            [PermissionLevel.Read]: 1,
+            [PermissionLevel.Write]: 2,
+            [PermissionLevel.Admin]: 3
+        };
+
+        return levelOrder[permission.level] >= levelOrder[requiredLevel];
+    }
+
+    /**
+     * Set (create or update) a permission.
+     * @param permission The permission to set
+     * @returns The saved permission
+     */
+    async setPermission(permission: AppPermission): Promise<AppPermission> {
+        // Normalize email to lowercase
+        permission = { ...permission, email: permission.email.toLowerCase() };
+
+        const existingPermission = await this.getPermission(permission.id);
+
+        await this._executeAction({
+            table: this.permissionsTable,
+            auth: this.permissionsConnection,
+            actId: existingPermission ? 'update' : 'add',
+            rows: [permission]
+        });
+
+        return permission;
+    }
+
+    /**
+     * Delete a permission by ID.
+     * @param permissionId Permission ID
+     * @returns True if deleted
+     */
+    async deletePermission(permissionId: string): Promise<boolean> {
+        const permission = await this.getPermission(permissionId);
+        if (!permission) return false;
+
+        await this._executeAction({
+            table: this.permissionsTable,
+            auth: this.permissionsConnection,
+            actId: 'delete',
+            rows: [permission]
+        });
+
+        return true;
+    }
+
+    /**
+     * Delete all permissions for a target.
+     * @param target The permission target (targetType and targetId)
+     */
+    async deletePermissions(target: PermissionTarget): Promise<void> {
+        const permissions = await this.getPermissions(target);
+
+        for (const permission of permissions) {
+            await this._executeAction({
+                table: this.permissionsTable,
+                auth: this.permissionsConnection,
+                actId: 'delete',
+                rows: [permission]
+            });
+        }
     }
 
     async getSchema(appId: string) {
@@ -231,7 +463,7 @@ export default class DataService {
         return schema;
     }
 
-    async setSchema(schema: AppSchema) {
+    async setSchema(schema: AppSchema, owner?: string) {
         const hasSchema = await this.getSchema(schema.id);
         this.schemaCache.set(schema.id, schema);
 
@@ -240,6 +472,16 @@ export default class DataService {
             actId: hasSchema ? 'update' : 'add',
             rows: [schema]
         });
+
+        if (!hasSchema && owner) {
+            await this.setPermission({
+                id: randomUUID(),
+                targetType: PermissionTargetType.App,
+                targetId: schema.id,
+                email: owner.toLowerCase(),
+                level: PermissionLevel.Admin
+            });
+        }
 
         return schema;
     }

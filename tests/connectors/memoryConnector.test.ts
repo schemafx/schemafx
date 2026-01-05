@@ -209,21 +209,21 @@ describe('MemoryConnector', () => {
                 { id: 1 },
                 { id: 1, name: 'Updated' }
             );
-            expect(connector.tables.get('users')![0].name).toBe('User 1');
+            expect(connector.tables.get('users')?.[0]?.name).toBe('User 1');
         });
 
         it('should not update when key is undefined', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, undefined, { id: 1, name: 'Updated' });
 
-            expect(connector.tables.get('users')![0].name).toBe('User 1');
+            expect(connector.tables.get('users')?.[0]?.name).toBe('User 1');
         });
 
         it('should not update when row is undefined', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, { id: 1 }, undefined);
 
-            expect(connector.tables.get('users')![0].name).toBe('User 1');
+            expect(connector.tables.get('users')?.[0]?.name).toBe('User 1');
         });
 
         it('should not update when row not found', async () => {
@@ -232,7 +232,7 @@ describe('MemoryConnector', () => {
 
             const data = connector.tables.get('users')!;
             expect(data).toHaveLength(1);
-            expect(data[0].name).toBe('User 1');
+            expect(data[0]?.name).toBe('User 1');
         });
 
         it('should not update when table does not exist', async () => {
@@ -246,14 +246,14 @@ describe('MemoryConnector', () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1' });
             await connector.updateRow!(table, undefined, { id: 1 }, { id: 1, name: 'Updated' });
 
-            expect(connector.tables.get('users')![0].name).toBe('Updated');
+            expect(connector.tables.get('users')?.[0]?.name).toBe('Updated');
         });
 
         it('should merge row data on update', async () => {
             await connector.addRow!(table, undefined, { id: 1, name: 'User 1', extra: 'data' });
             await connector.updateRow!(table, undefined, { id: 1 }, { name: 'Updated' });
 
-            expect(connector.tables.get('users')![0]).toEqual({
+            expect(connector.tables.get('users')?.[0]).toEqual({
                 id: 1,
                 name: 'Updated',
                 extra: 'data'
@@ -315,7 +315,7 @@ describe('MemoryConnector', () => {
 
             const data = connector.tables.get('users')!;
             expect(data).toHaveLength(1);
-            expect(data[0].id).toBe(2);
+            expect(data[0]?.id).toBe(2);
         });
     });
 });

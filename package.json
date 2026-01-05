@@ -16,7 +16,7 @@
         "url": "https://github.com/schemafx/schemafx.git"
     },
     "scripts": {
-        "build": "npm run build:clean && tsc -b --clean && tsc -b",
+        "build": "npm run build:clean && tsc -b --clean tsconfig.build.json && tsc -b tsconfig.build.json",
         "build:clean": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true })\"",
         "start": "node .",
         "dev": "tsx watch dev/dev.ts --watch ./src --watch ./dev",
@@ -57,6 +57,7 @@
         "eslint-config-flat-gitignore": "^2.1.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-prettier": "^5.5.4",
+        "eslint-plugin-sonarjs": "^3.0.5",
         "prettier": "^3.6.2",
         "tsx": "^4.20.3",
         "typescript": "^5.9.3",

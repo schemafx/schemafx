@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { AppSchemaSchema, ConnectorTableSchema } from '../types.js';
+import { AppSchemaSchema, AppViewType, ConnectorTableSchema } from '../types.js';
 import { validateTableKeys } from '../utils/schemaUtils.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
@@ -228,12 +228,15 @@ const plugin: FastifyPluginAsyncZod<{
 
             const { state, ...query } = request.query;
             const authResult = await connector.authorize({ ...query });
-            const connection = await dataService.setConnection({
-                id: randomUUID(),
-                connector: connector.id,
-                name: authResult.name,
-                content: authResult.content
-            });
+            const connection = await dataService.setConnection(
+                {
+                    id: randomUUID(),
+                    connector: connector.id,
+                    name: authResult.name,
+                    content: authResult.content
+                },
+                authResult.email
+            );
 
             const response: { connectionId: string; code?: string } = {
                 connectionId: connection.id
@@ -256,7 +259,7 @@ const plugin: FastifyPluginAsyncZod<{
                             redirect.searchParams.set(k, v);
                         }
 
-                        return reply.redirect(redirect.href, 302);
+                        return await reply.redirect(redirect.href, 302);
                     }
                 }
             } catch {}
@@ -296,12 +299,15 @@ const plugin: FastifyPluginAsyncZod<{
             }
 
             const authResult = await connector.authorize({ ...request.body });
-            const connection = await dataService.setConnection({
-                id: randomUUID(),
-                connector: connector.id,
-                name: authResult.name,
-                content: authResult.content
-            });
+            const connection = await dataService.setConnection(
+                {
+                    id: randomUUID(),
+                    connector: connector.id,
+                    name: authResult.name,
+                    content: authResult.content
+                },
+                authResult.email
+            );
 
             const response: { connectionId: string; code?: string } = {
                 connectionId: connection.id
@@ -375,17 +381,44 @@ const plugin: FastifyPluginAsyncZod<{
                     });
                 }
 
+                // Prevent adding the same table (same connector + path) twice
+                const exists = schema.tables.some(
+                    t =>
+                        t.connector === table.connector &&
+                        Array.isArray(t.path) &&
+                        Array.isArray(table.path) &&
+                        t.path.length === table.path.length &&
+                        t.path.every((p, i) => p === table.path[i])
+                );
+
+                if (exists) {
+                    return reply.code(400).send({
+                        error: 'Bad Request',
+                        message: 'Table already exists in application.'
+                    });
+                }
+
                 schema.tables.push(table);
             } else {
                 schema = {
                     id: randomUUID(),
                     name: 'New App',
                     tables: [table],
-                    views: []
+                    views: [
+                        {
+                            id: randomUUID(),
+                            name: table.name,
+                            tableId: table.id,
+                            type: AppViewType.Table,
+                            config: {
+                                fields: table.fields.map(f => f.id)
+                            }
+                        }
+                    ]
                 };
             }
 
-            return dataService.setSchema(schema);
+            return dataService.setSchema(schema, request.user?.email);
         }
     );
 };

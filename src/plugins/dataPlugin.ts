@@ -1,19 +1,81 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { AppTableRowSchema, TableQueryOptionsSchema } from '../types.js';
-import { tableQuerySchema } from '../utils/fastifyUtils.js';
-import type { FastifyReply } from 'fastify';
+import {
+    AppTableRowSchema,
+    TableQueryOptionsSchema,
+    PermissionTargetType,
+    PermissionLevel,
+    type AppSchema,
+    type AppTable,
+    type Connector
+} from '../types.js';
+import { tableQuerySchema, ErrorResponseSchema } from '../utils/fastifyUtils.js';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type DataService from '../services/DataService.js';
 
 const plugin: FastifyPluginAsyncZod<{
     dataService: DataService;
 }> = async (fastify, { dataService }) => {
-    async function handleTable(appId: string, tableId: string, reply: FastifyReply) {
+    /**
+     * Check if the user has the required permission level for an app.
+     * Returns an error response if not authorized, undefined if authorized.
+     */
+    async function checkAppPermission(
+        request: FastifyRequest,
+        reply: FastifyReply,
+        appId: string,
+        requiredLevel: PermissionLevel
+    ): Promise<{ error: true; response: unknown } | undefined> {
+        const email = request.user?.email;
+
+        if (!email) {
+            return {
+                error: true,
+                response: reply.code(401).send({
+                    error: 'Unauthorized',
+                    message: 'Authentication required.'
+                })
+            };
+        }
+
+        const hasAccess = await dataService.hasPermission(
+            { targetType: PermissionTargetType.App, targetId: appId },
+            email,
+            requiredLevel
+        );
+
+        if (!hasAccess) {
+            return {
+                error: true,
+                response: reply.code(403).send({
+                    error: 'Forbidden',
+                    message: `You do not have ${requiredLevel} permission for this application.`
+                })
+            };
+        }
+
+        return undefined;
+    }
+
+    async function handleTable(
+        appId: string,
+        tableId: string,
+        reply: FastifyReply
+    ): Promise<
+        | { success: false; response: unknown }
+        | {
+              success: true;
+              schema: AppSchema;
+              table: AppTable;
+              connectorName: string;
+              connector: Connector;
+          }
+    > {
         const schema = await dataService.getSchema(appId);
 
         if (!schema) {
             return {
-                schema,
+                success: false,
                 response: reply.code(404).send({
                     error: 'Not Found',
                     message: 'Application not found.'
@@ -21,12 +83,11 @@ const plugin: FastifyPluginAsyncZod<{
             };
         }
 
-        const table = schema.tables.find(table => table.id === tableId);
+        const table = schema.tables.find(t => t.id === tableId);
 
         if (!table) {
             return {
-                schema,
-                table,
+                success: false,
                 response: reply.code(400).send({
                     error: 'Data Error',
                     message: 'Invalid table.'
@@ -39,10 +100,7 @@ const plugin: FastifyPluginAsyncZod<{
 
         if (!connector) {
             return {
-                schema,
-                table,
-                connectorName,
-                connector,
+                success: false,
                 response: reply.code(500).send({
                     error: 'Data Error',
                     message: 'Invalid connector.'
@@ -50,23 +108,32 @@ const plugin: FastifyPluginAsyncZod<{
             };
         }
 
-        return { schema, table, connectorName, connector, success: true };
+        return { success: true, schema, table, connectorName, connector };
     }
 
     fastify.get(
         '/apps/:appId/data/:tableId',
         {
             onRequest: [fastify.authenticate],
-            schema: tableQuerySchema
+            schema: {
+                ...tableQuerySchema,
+                response: {
+                    ...tableQuerySchema.response,
+                    401: ErrorResponseSchema,
+                    403: ErrorResponseSchema
+                }
+            }
         },
         async (request, reply) => {
-            const { response, success, table } = await handleTable(
-                request.params.appId,
-                request.params.tableId,
-                reply
-            );
+            const { appId, tableId } = request.params;
 
-            if (!success || !table) return response;
+            // Check read permission
+            const permError = await checkAppPermission(request, reply, appId, PermissionLevel.Read);
+            if (permError) return permError.response;
+
+            const result = await handleTable(appId, tableId, reply);
+
+            if (!result.success) return result.response;
 
             let query;
             if (request.query.query) {
@@ -75,7 +142,7 @@ const plugin: FastifyPluginAsyncZod<{
                 query = parsed;
             }
 
-            return dataService.getData(table, query);
+            return dataService.getData(result.table, query);
         }
     );
 
@@ -95,28 +162,38 @@ const plugin: FastifyPluginAsyncZod<{
                         payload: z.any().optional().meta({ description: 'Action payload' })
                     })
                     .meta({ description: 'Action execution request' }),
-                ...tableQuerySchema
+                ...tableQuerySchema,
+                response: {
+                    ...tableQuerySchema.response,
+                    401: ErrorResponseSchema,
+                    403: ErrorResponseSchema
+                }
             }
         },
         async (request, reply) => {
             const { appId, tableId } = request.params;
             const { actionId, rows } = request.body;
 
-            const { response, success, connector, table } = await handleTable(
+            // Check write permission for data actions
+            const permError = await checkAppPermission(
+                request,
+                reply,
                 appId,
-                tableId,
-                reply
+                PermissionLevel.Write
             );
+            if (permError) return permError.response;
 
-            if (!success || !table || !connector) return response;
+            const result = await handleTable(appId, tableId, reply);
+
+            if (!result.success) return result.response;
 
             await dataService.executeAction({
-                table,
+                table: result.table,
                 actId: actionId,
                 rows
             });
 
-            return dataService.getData(table);
+            return dataService.getData(result.table);
         }
     );
 };

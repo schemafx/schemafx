@@ -53,7 +53,7 @@ describe('inferTable', () => {
 
     it('should default to Text for unknown types', () => {
         const data = [{ val: Symbol('s') }];
-        const table = inferTable('Table', [], data as any, 'mem');
+        const table = inferTable('Table', [], data, 'mem');
 
         expect(table.fields.find(f => f.id === 'val')?.type).toBe(AppFieldType.Text);
     });

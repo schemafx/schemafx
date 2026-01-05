@@ -21,7 +21,7 @@ describe('Schema API', () => {
         app = testApp.app;
         server = app.fastifyInstance;
         connector = testApp.connector;
-        token = testApp.token;
+        token = testApp.token!;
     });
 
     afterEach(async () => {
@@ -165,10 +165,10 @@ describe('Schema API', () => {
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
 
-        const table = body.tables.find((t: any) => t.id === 't1');
+        const table = body.tables.find(t => t.id === 't1');
         expect(table?.fields).toHaveLength(1);
 
-        const view = body.views.find((v: any) => v.id === 'v1');
+        const view = body.views.find(v => v.id === 'v1');
         expect(view?.config.fields).not.toContain('f2');
         expect(view?.config.fields).toHaveLength(1);
     });
@@ -303,7 +303,7 @@ describe('Schema API', () => {
 
         expect(response.statusCode).toBe(200);
         let body = JSON.parse(response.payload) as AppSchema;
-        expect(body.tables[0].actions).toHaveLength(1);
+        expect(body.tables[0]?.actions ?? []).toHaveLength(1);
 
         response = await server.inject({
             method: 'POST',
@@ -321,7 +321,7 @@ describe('Schema API', () => {
 
         expect(response.statusCode).toBe(200);
         body = JSON.parse(response.payload) as AppSchema;
-        expect(body.tables[0].actions[0].name).toBe('A1 Updated');
+        expect(body.tables[0]?.actions[0]?.name).toBe('A1 Updated');
 
         response = await server.inject({
             method: 'POST',
@@ -338,7 +338,8 @@ describe('Schema API', () => {
         });
         expect(response.statusCode).toBe(200);
         body = JSON.parse(response.payload) as AppSchema;
-        expect(body.tables[0].actions).toHaveLength(0);
+        expect(body.tables[0]).toBeDefined();
+        expect(body.tables[0]?.actions).toHaveLength(0);
     });
 
     it('should reorder tables', async () => {
@@ -380,7 +381,7 @@ describe('Schema API', () => {
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload) as AppSchema;
-        expect(body.tables[0].id).toBe('t2');
-        expect(body.tables[1].id).toBe('t1');
+        expect(body.tables[0]?.id).toBe('t2');
+        expect(body.tables[1]?.id).toBe('t1');
     });
 });

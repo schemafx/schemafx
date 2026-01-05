@@ -259,6 +259,42 @@ export const AppConnectionSchema = z.object({
 
 export type AppConnection = z.infer<typeof AppConnectionSchema>;
 
+// ============================================================================
+// Permission Definitions
+// ============================================================================
+
+/**
+ * Permission levels for application access.
+ */
+export enum PermissionLevel {
+    /** Read-only access to the application */
+    Read = 'read',
+    /** Read and write access to the application */
+    Write = 'write',
+    /** Full administrative access including permission management */
+    Admin = 'admin'
+}
+
+/**
+ * Target type for permissions - extensible for future entity types.
+ */
+export enum PermissionTargetType {
+    /** Permission for an application/schema */
+    App = 'app',
+    /** Permission for a connection */
+    Connection = 'connection'
+}
+
+export const AppPermissionSchema = z.object({
+    id: z.string(),
+    targetType: z.enum(Object.values(PermissionTargetType)),
+    targetId: z.string().min(1),
+    email: z.string().email(),
+    level: z.enum(Object.values(PermissionLevel))
+});
+
+export type AppPermission = z.infer<typeof AppPermissionSchema>;
+
 export enum QueryFilterOperator {
     Equals = 'eq',
     NotEqual = 'ne',

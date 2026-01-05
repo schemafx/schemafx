@@ -48,7 +48,7 @@ class BenchmarkConnector extends Connector {
         };
     }
 
-    async getData(): Promise<DataSourceDefinition> {
+    override async getData(): Promise<DataSourceDefinition> {
         const rows = [];
         for (let i = 0; i < this.rowCount; i++) {
             rows.push({
@@ -69,6 +69,7 @@ describe('DuckDB Integration Benchmark', () => {
     let app: SchemaFX;
     const schemaId = 'app1';
     let token: string;
+    const testEmail = 'dev@schemafx.com';
 
     beforeAll(async () => {
         const memConnector = new MemoryConnector({ name: 'memory' });
@@ -85,32 +86,41 @@ describe('DuckDB Integration Benchmark', () => {
                     connector: memConnector.id,
                     path: ['connections']
                 },
+                permissionsConnector: {
+                    connector: memConnector.id,
+                    path: ['permissions']
+                },
                 connectors: [memConnector, benchConnector]
             }
         });
 
-        await app.fastifyInstance.ready();
-        token = app.fastifyInstance.jwt.sign({ id: 'dev@schemafx.com' });
+        const server = app.fastifyInstance;
 
-        await app.dataService.setSchema({
-            id: schemaId,
-            name: 'Benchmark App',
-            tables: [
-                {
-                    id: 'users',
-                    name: 'Users',
-                    connector: benchConnector.id,
-                    path: ['users'],
-                    fields: [
-                        { id: 'id', name: 'ID', type: AppFieldType.Number },
-                        { id: 'name', name: 'Name', type: AppFieldType.Text },
-                        { id: 'active', name: 'Active', type: AppFieldType.Boolean }
-                    ],
-                    actions: []
-                }
-            ],
-            views: []
-        });
+        await server.ready();
+        token = server.jwt.sign({ email: testEmail });
+
+        await app.dataService.setSchema(
+            {
+                id: schemaId,
+                name: 'Benchmark App',
+                tables: [
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        connector: benchConnector.id,
+                        path: ['users'],
+                        fields: [
+                            { id: 'id', name: 'ID', type: AppFieldType.Number },
+                            { id: 'name', name: 'Name', type: AppFieldType.Text },
+                            { id: 'active', name: 'Active', type: AppFieldType.Boolean }
+                        ],
+                        actions: []
+                    }
+                ],
+                views: []
+            },
+            testEmail
+        );
     });
 
     afterAll(async () => {
