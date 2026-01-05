@@ -161,20 +161,37 @@ describe('Connectors API', () => {
     });
 
     it('should import table from connector to existing app', async () => {
+        // Mock new table.
+        (app.dataService.connectors.mem as MemoryConnector).tables.set('table1', [{ id: '' }]);
+
+        const payload = {
+            path: ['table1'],
+            appId: 'app1'
+        };
+
         const response = await server.inject({
             method: 'POST',
             url: '/api/connectors/mem/table',
             headers: { Authorization: `Bearer ${token}` },
-            payload: {
-                path: ['users'],
-                appId: 'app1'
-            }
+            payload
         });
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.payload);
         expect(body.id).toBe('app1');
         expect(body.tables).toHaveLength(2);
+
+        const duplicateResponse = await server.inject({
+            method: 'POST',
+            url: '/api/connectors/mem/table',
+            headers: { Authorization: `Bearer ${token}` },
+            payload
+        });
+
+        // Importing the same connector + path into an existing app should fail
+        expect(duplicateResponse.statusCode).toBe(400);
+        const duplicateBody = JSON.parse(duplicateResponse.payload);
+        expect(duplicateBody.message).toBe('Table already exists in application.');
     });
 
     it('should 404 for unknown connector table', async () => {

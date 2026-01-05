@@ -400,6 +400,23 @@ const plugin: FastifyPluginAsyncZod<{
                     });
                 }
 
+                // Prevent adding the same table (same connector + path) twice
+                const exists = schema.tables.some(
+                    t =>
+                        t.connector === table.connector &&
+                        Array.isArray(t.path) &&
+                        Array.isArray(table.path) &&
+                        t.path.length === table.path.length &&
+                        t.path.every((p, i) => p === table.path[i])
+                );
+
+                if (exists) {
+                    return reply.code(400).send({
+                        error: 'Bad Request',
+                        message: 'Table already exists in application.'
+                    });
+                }
+
                 schema.tables.push(table);
             } else {
                 isNewApp = true;
