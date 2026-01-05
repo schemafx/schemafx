@@ -1,6 +1,5 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { PermissionLevel, PermissionTargetType } from '../types.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type DataService from '../services/DataService.js';
 import { randomUUID } from 'node:crypto';
@@ -45,21 +44,15 @@ const plugin: FastifyPluginAsyncZod<{
                 });
             }
 
-            const connection = await dataService.setConnection({
-                id: randomUUID(),
-                connector: connector.id,
-                name: authResult.name,
-                content: authResult.content
-            });
-
-            // Grant admin permission on the connection to the creator
-            await dataService.setPermission({
-                id: randomUUID(),
-                targetType: PermissionTargetType.Connection,
-                targetId: connection.id,
-                email: authResult.email,
-                level: PermissionLevel.Admin
-            });
+            const connection = await dataService.setConnection(
+                {
+                    id: randomUUID(),
+                    connector: connector.id,
+                    name: authResult.name,
+                    content: authResult.content
+                },
+                authResult.email
+            );
 
             return {
                 token: fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' }),

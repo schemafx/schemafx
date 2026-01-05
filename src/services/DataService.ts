@@ -230,7 +230,7 @@ export default class DataService {
         )) as AppConnection[];
     }
 
-    async setConnection(connection: AppConnection) {
+    async setConnection(connection: AppConnection, owner?: string) {
         const existingConnection = await this.getConnection(connection.id);
         this.connectionsCache.set(connection.id, connection);
 
@@ -240,6 +240,16 @@ export default class DataService {
             actId: existingConnection ? 'update' : 'add',
             rows: [connection]
         });
+
+        if (!existingConnection && owner) {
+            await this.setPermission({
+                id: randomUUID(),
+                targetType: PermissionTargetType.Connection,
+                targetId: connection.id,
+                email: owner.toLowerCase(),
+                level: PermissionLevel.Admin
+            });
+        }
 
         return connection;
     }

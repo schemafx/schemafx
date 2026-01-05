@@ -132,6 +132,7 @@ const plugin: FastifyPluginAsyncZod<{
                 { targetType, targetId },
                 targetEmail
             );
+
             if (existingPermission) {
                 return reply.code(409).send({
                     error: 'Conflict',

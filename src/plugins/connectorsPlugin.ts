@@ -1,12 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import {
-    AppSchemaSchema,
-    AppViewType,
-    ConnectorTableSchema,
-    PermissionLevel,
-    PermissionTargetType
-} from '../types.js';
+import { AppSchemaSchema, AppViewType, ConnectorTableSchema } from '../types.js';
 import { validateTableKeys } from '../utils/schemaUtils.js';
 import { ErrorResponseSchema } from '../utils/fastifyUtils.js';
 import type { AppSchema } from '../types.js';
@@ -234,27 +228,21 @@ const plugin: FastifyPluginAsyncZod<{
 
             const { state, ...query } = request.query;
             const authResult = await connector.authorize({ ...query });
-            const connection = await dataService.setConnection({
-                id: randomUUID(),
-                connector: connector.id,
-                name: authResult.name,
-                content: authResult.content
-            });
+            const connection = await dataService.setConnection(
+                {
+                    id: randomUUID(),
+                    connector: connector.id,
+                    name: authResult.name,
+                    content: authResult.content
+                },
+                authResult.email
+            );
 
             const response: { connectionId: string; code?: string } = {
                 connectionId: connection.id
             };
 
             if (authResult.email) {
-                // Grant admin permission on the connection to the creator
-                await dataService.setPermission({
-                    id: randomUUID(),
-                    targetType: PermissionTargetType.Connection,
-                    targetId: connection.id,
-                    email: authResult.email,
-                    level: PermissionLevel.Admin
-                });
-
                 const token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
                 response.code = storeTokenCode(token);
             }
@@ -311,27 +299,21 @@ const plugin: FastifyPluginAsyncZod<{
             }
 
             const authResult = await connector.authorize({ ...request.body });
-            const connection = await dataService.setConnection({
-                id: randomUUID(),
-                connector: connector.id,
-                name: authResult.name,
-                content: authResult.content
-            });
+            const connection = await dataService.setConnection(
+                {
+                    id: randomUUID(),
+                    connector: connector.id,
+                    name: authResult.name,
+                    content: authResult.content
+                },
+                authResult.email
+            );
 
             const response: { connectionId: string; code?: string } = {
                 connectionId: connection.id
             };
 
             if (authResult.email) {
-                // Grant admin permission on the connection to the creator
-                await dataService.setPermission({
-                    id: randomUUID(),
-                    targetType: PermissionTargetType.Connection,
-                    targetId: connection.id,
-                    email: authResult.email,
-                    level: PermissionLevel.Admin
-                });
-
                 const token = fastify.jwt.sign({ email: authResult.email }, { expiresIn: '8h' });
                 response.code = storeTokenCode(token);
             }
